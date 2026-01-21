@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from "react-router-dom";
-import { LayoutDashboard, Zap, History, Settings, LogOut, LineChart } from "lucide-react";
+import { LayoutDashboard, Zap, History, Settings, LogOut, LineChart, CalendarDays, Calculator } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { useAuth } from "../../contexts/AuthContext";
 
@@ -15,6 +15,8 @@ export function Sidebar() {
   const navItems = [
     { icon: LayoutDashboard, label: "Dashboard", to: "/" },
     { icon: Zap, label: "Live Surebets", to: "/live" },
+    { icon: CalendarDays, label: "Jogos do Dia", to: "/games" },
+    { icon: Calculator, label: "Calculadora", to: "/calculator" }, // New Item
     { icon: History, label: "Histórico", to: "/history" },
     { icon: Settings, label: "Configurações", to: "/settings" },
   ];

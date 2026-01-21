@@ -1,14 +1,19 @@
-import { Save, MessageCircle, Smartphone, Loader2, Key, Globe, Power, PauseCircle, PlayCircle } from "lucide-react";
+import { Save, Loader2, Key, Globe, PlayCircle, PauseCircle, RefreshCw, Server, Zap, Database } from "lucide-react";
 import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../contexts/AuthContext";
 import { useToast } from "../contexts/ToastContext";
+import { theOddsApiService } from "../services/theOddsApiService";
+import { rapidApiService } from "../services/rapidApiService";
+import { betsApiService } from "../services/betsApiService";
+import { sportmonksService } from "../services/sportmonksService";
 
 export function Settings() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [testingApi, setTestingApi] = useState(false);
   
   // Settings State
   const [bankroll, setBankroll] = useState(5000);
@@ -17,8 +22,22 @@ export function Settings() {
   const [roiMin, setRoiMin] = useState(0.8);
   const [telegramEnabled, setTelegramEnabled] = useState(false);
   const [whatsappEnabled, setWhatsappEnabled] = useState(false);
+  
+  // API 1: The-Odds-API
   const [apiKey, setApiKey] = useState("");
-  const [apiEnabled, setApiEnabled] = useState(true); // Novo estado
+  const [apiEnabled, setApiEnabled] = useState(true);
+
+  // API 2: Secondary (RapidAPI)
+  const [secApiKey, setSecApiKey] = useState("");
+  const [secApiEnabled, setSecApiEnabled] = useState(false);
+
+  // API 3: Tertiary (BetsAPI)
+  const [terApiKey, setTerApiKey] = useState("");
+  const [terApiEnabled, setTerApiEnabled] = useState(false);
+
+  // API 4: Quaternary (Sportmonks)
+  const [quatApiKey, setQuatApiKey] = useState("");
+  const [quatApiEnabled, setQuatApiEnabled] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -46,7 +65,16 @@ export function Settings() {
           setWhatsappEnabled(channels.whatsapp || false);
           
           setApiKey(data.external_api_key || "");
-          setApiEnabled(data.api_enabled !== false); // Default true se null
+          setApiEnabled(data.api_enabled !== false);
+
+          setSecApiKey(data.secondary_api_key || "");
+          setSecApiEnabled(data.secondary_api_enabled || false);
+
+          setTerApiKey(data.tertiary_api_key || "");
+          setTerApiEnabled(data.tertiary_api_enabled || false);
+
+          setQuatApiKey(data.quaternary_api_key || "");
+          setQuatApiEnabled(data.quaternary_api_enabled || false);
         }
       } catch (err) {
         console.error("Error loading settings:", err);
@@ -75,7 +103,13 @@ export function Settings() {
           whatsapp: whatsappEnabled
         },
         external_api_key: apiKey,
-        api_enabled: apiEnabled // Salvando novo estado
+        api_enabled: apiEnabled,
+        secondary_api_key: secApiKey,
+        secondary_api_enabled: secApiEnabled,
+        tertiary_api_key: terApiKey,
+        tertiary_api_enabled: terApiEnabled,
+        quaternary_api_key: quatApiKey,
+        quaternary_api_enabled: quatApiEnabled
       };
 
       const { error } = await supabase
@@ -92,6 +126,63 @@ export function Settings() {
       toast("Erro ao salvar: " + err.message, "error");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleTestApi = async () => {
+    if (!apiKey && !secApiKey && !terApiKey && !quatApiKey) {
+      toast("Insira e salve pelo menos uma chave de API.", "error");
+      return;
+    }
+    
+    setTestingApi(true);
+    toast("Iniciando varredura manual nas APIs ativas...", "info");
+
+    try {
+      // Testa API 1
+      if (apiKey && apiEnabled) {
+        const result = await theOddsApiService.fetchAndProcessOdds(apiKey);
+        if (result.success) {
+          toast(`The-Odds-API: ${result.events} jogos, ${result.arbs} arbs.`, "success");
+        } else {
+          toast(`Erro The-Odds-API: ${result.error}`, "error");
+        }
+      }
+
+      // Testa API 2
+      if (secApiKey && secApiEnabled) {
+        const result = await rapidApiService.fetchAndProcessOdds(secApiKey);
+        if (result.success) {
+          toast(`RapidAPI: Conexão OK.`, "success");
+        } else {
+          toast(`Erro RapidAPI: ${result.error}`, "error");
+        }
+      }
+
+      // Testa API 3
+      if (terApiKey && terApiEnabled) {
+        const result = await betsApiService.fetchAndProcessOdds(terApiKey);
+        if (result.success) {
+          toast(`BetsAPI: Conexão OK.`, "success");
+        } else {
+          toast(`Erro BetsAPI: ${result.error}`, "error");
+        }
+      }
+
+      // Testa API 4
+      if (quatApiKey && quatApiEnabled) {
+        const result = await sportmonksService.fetchAndProcessOdds(quatApiKey);
+        if (result.success) {
+          toast(`Sportmonks: Conexão OK.`, "success");
+        } else {
+          toast(`Erro Sportmonks: ${result.error}`, "error");
+        }
+      }
+
+    } catch (err) {
+      toast("Erro inesperado ao testar APIs.", "error");
+    } finally {
+      setTestingApi(false);
     }
   };
 
@@ -112,56 +203,127 @@ export function Settings() {
         <section className="bg-slate-950 border border-slate-800 rounded-xl p-6 relative overflow-hidden">
           <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none"></div>
           
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between mb-6">
             <h2 className="text-lg font-semibold text-slate-200 flex items-center gap-2">
               <span className="w-1 h-6 bg-purple-500 rounded-full"></span>
-              Provedor de Dados (Odds Reais)
+              Fontes de Dados (Odds)
             </h2>
             
-            {/* Toggle Button */}
             <button
-              onClick={() => setApiEnabled(!apiEnabled)}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${
-                apiEnabled 
-                  ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/30" 
-                  : "bg-slate-800 text-slate-400 border border-slate-700 hover:bg-slate-700"
-              }`}
+              onClick={handleTestApi}
+              disabled={testingApi}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20 hover:bg-blue-500/20 transition-all disabled:opacity-50"
             >
-              {apiEnabled ? <PlayCircle className="w-4 h-4" /> : <PauseCircle className="w-4 h-4" />}
-              {apiEnabled ? "INTEGRAÇÃO ATIVA" : "INTEGRAÇÃO PAUSADA"}
+              <RefreshCw className={`w-3.5 h-3.5 ${testingApi ? 'animate-spin' : ''}`} />
+              {testingApi ? "Testando..." : "Testar Conexões"}
             </button>
           </div>
           
-          <div className="space-y-4">
-            <div className={`bg-slate-900/50 p-4 rounded-lg border transition-colors ${apiEnabled ? 'border-slate-800' : 'border-amber-500/20 bg-amber-500/5'}`}>
-              <div className="flex items-start gap-3">
-                <Globe className={`w-5 h-5 mt-1 ${apiEnabled ? 'text-purple-400' : 'text-slate-500'}`} />
-                <div>
-                  <h3 className="text-sm font-medium text-slate-200">The-Odds-API</h3>
-                  <p className="text-xs text-slate-500 mt-1">
-                    {apiEnabled 
-                      ? "O sistema buscará odds reais a cada 60 segundos." 
-                      : "A busca de odds reais está PAUSADA. O sistema rodará em modo de simulação."}
-                  </p>
+          <div className="grid md:grid-cols-2 gap-4">
+            {/* API 1: The-Odds-API */}
+            <div className={`p-4 rounded-lg border transition-all ${apiEnabled ? 'bg-slate-900/50 border-slate-700' : 'bg-slate-900/20 border-slate-800 opacity-70'}`}>
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Globe className="w-5 h-5 text-purple-400" />
+                  <span className="font-bold text-slate-200 text-sm">The-Odds-API</span>
                 </div>
+                <button
+                  onClick={() => setApiEnabled(!apiEnabled)}
+                  className={`text-[10px] font-bold px-2 py-1 rounded transition-colors ${apiEnabled ? 'text-emerald-400 bg-emerald-500/10' : 'text-slate-500 bg-slate-800'}`}
+                >
+                  {apiEnabled ? "ON" : "OFF"}
+                </button>
+              </div>
+              
+              <div className="space-y-2">
+                <input 
+                  type="text" 
+                  value={apiKey}
+                  onChange={(e) => setApiKey(e.target.value)}
+                  placeholder="Chave The-Odds-API..."
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-slate-200 text-xs font-mono focus:border-purple-500 focus:outline-none"
+                />
               </div>
             </div>
 
-            <div className={`space-y-2 transition-opacity ${apiEnabled ? 'opacity-100' : 'opacity-50 pointer-events-none'}`}>
-              <label className="text-sm font-medium text-slate-400 flex items-center gap-2">
-                <Key className="w-4 h-4" /> Chave de API
-              </label>
-              <input 
-                type="text" 
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-                placeholder="Cole sua API Key aqui..."
-                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-200 focus:outline-none focus:border-purple-500 font-mono text-sm"
-              />
-              <p className="text-xs text-slate-600">
-                Se deixar em branco, o sistema rodará em <strong>Modo Simulação</strong>.
-              </p>
+            {/* API 2: Secondary */}
+            <div className={`p-4 rounded-lg border transition-all ${secApiEnabled ? 'bg-slate-900/50 border-slate-700' : 'bg-slate-900/20 border-slate-800 opacity-70'}`}>
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Server className="w-5 h-5 text-blue-400" />
+                  <span className="font-bold text-slate-200 text-sm">RapidAPI (Football)</span>
+                </div>
+                <button
+                  onClick={() => setSecApiEnabled(!secApiEnabled)}
+                  className={`text-[10px] font-bold px-2 py-1 rounded transition-colors ${secApiEnabled ? 'text-emerald-400 bg-emerald-500/10' : 'text-slate-500 bg-slate-800'}`}
+                >
+                  {secApiEnabled ? "ON" : "OFF"}
+                </button>
+              </div>
+              
+              <div className="space-y-2">
+                <input 
+                  type="text" 
+                  value={secApiKey}
+                  onChange={(e) => setSecApiKey(e.target.value)}
+                  placeholder="Chave RapidAPI..."
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-slate-200 text-xs font-mono focus:border-blue-500 focus:outline-none"
+                />
+              </div>
             </div>
+
+            {/* API 3: Tertiary (BetsAPI) */}
+            <div className={`p-4 rounded-lg border transition-all ${terApiEnabled ? 'bg-slate-900/50 border-slate-700' : 'bg-slate-900/20 border-slate-800 opacity-70'}`}>
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Zap className="w-5 h-5 text-amber-400" />
+                  <span className="font-bold text-slate-200 text-sm">BetsAPI</span>
+                </div>
+                <button
+                  onClick={() => setTerApiEnabled(!terApiEnabled)}
+                  className={`text-[10px] font-bold px-2 py-1 rounded transition-colors ${terApiEnabled ? 'text-emerald-400 bg-emerald-500/10' : 'text-slate-500 bg-slate-800'}`}
+                >
+                  {terApiEnabled ? "ON" : "OFF"}
+                </button>
+              </div>
+              
+              <div className="space-y-2">
+                <input 
+                  type="text" 
+                  value={terApiKey}
+                  onChange={(e) => setTerApiKey(e.target.value)}
+                  placeholder="Token BetsAPI..."
+                  className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-slate-200 text-xs font-mono focus:border-amber-500 focus:outline-none"
+                />
+              </div>
+            </div>
+
+            {/* API 4: Quaternary (Sportmonks) */}
+            <div className={`p-4 rounded-lg border transition-all ${quatApiEnabled ? 'bg-slate-900/50 border-slate-700' : 'bg-slate-900/20 border-slate-800 opacity-70'}`}>
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Database className="w-5 h-5 text-emerald-400" />
+                  <span className="font-bold text-slate-200 text-sm">Sportmonks</span>
+                </div>
+                <button
+                  onClick={() => setQuatApiEnabled(!quatApiEnabled)}
+                  className={`text-[10px] font-bold px-2 py-1 rounded transition-colors ${quatApiEnabled ? 'text-emerald-400 bg-emerald-500/10' : 'text-slate-500 bg-slate-800'}`}
+                >
+                  {quatApiEnabled ? "ON" : "OFF"}
+                </button>
+              </div>
+              
+              <div className="space-y-2">
+                <input 
+                  type="text" 
+                  value={quatApiKey}
+                  onChange={(e) => setQuatApiKey(e.target.value)}
+                  placeholder="Token Sportmonks..."
+                  className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-slate-200 text-xs font-mono focus:border-emerald-500 focus:outline-none"
+                />
+              </div>
+            </div>
+
           </div>
         </section>
 

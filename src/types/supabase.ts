@@ -22,7 +22,13 @@ export interface Database {
           cooldown_sec: number
           channels: Json | null
           external_api_key: string | null
-          api_enabled: boolean // Nova coluna
+          api_enabled: boolean
+          secondary_api_key: string | null
+          secondary_api_enabled: boolean
+          tertiary_api_key: string | null
+          tertiary_api_enabled: boolean
+          quaternary_api_key: string | null // Novo (Sportmonks)
+          quaternary_api_enabled: boolean // Novo (Sportmonks)
         }
         Insert: {
           user_id: string
@@ -37,6 +43,12 @@ export interface Database {
           channels?: Json | null
           external_api_key?: string | null
           api_enabled?: boolean
+          secondary_api_key?: string | null
+          secondary_api_enabled?: boolean
+          tertiary_api_key?: string | null
+          tertiary_api_enabled?: boolean
+          quaternary_api_key?: string | null // Novo
+          quaternary_api_enabled?: boolean // Novo
         }
         Update: {
           user_id?: string
@@ -51,8 +63,15 @@ export interface Database {
           channels?: Json | null
           external_api_key?: string | null
           api_enabled?: boolean
+          secondary_api_key?: string | null
+          secondary_api_enabled?: boolean
+          tertiary_api_key?: string | null
+          tertiary_api_enabled?: boolean
+          quaternary_api_key?: string | null // Novo
+          quaternary_api_enabled?: boolean // Novo
         }
       }
+      // ... (outras tabelas permanecem iguais, omitindo para brevidade pois não mudaram)
       arbs: {
         Row: {
           id: string

@@ -29,43 +29,79 @@ export const theOddsApiService = {
    * Busca odds reais da API e salva no banco de dados
    */
   async fetchAndProcessOdds(apiKey: string) {
-    try {
-      console.log("[Real API] Fetching data from The-Odds-API...");
+    let totalEvents = 0;
+    let totalArbs = 0;
+    let errorsCount = 0;
 
-      // 1. Definir quais esportes buscar (Futebol e Basquete para MVP)
-      // Para economizar quota, vamos buscar apenas EPL e NBA neste exemplo
-      const sportKeys = ['soccer_epl', 'basketball_nba'];
-      
-      for (const sportKey of sportKeys) {
-        // Fetch da API Externa
+    console.group("🔍 [Real API] Starting Scan...");
+
+    // 1. Lista expandida de ligas para cobrir mais jogos reais
+    const sportKeys = [
+      'soccer_epl',               // Premier League
+      'basketball_nba',           // NBA
+      'soccer_spain_la_liga',     // La Liga
+      'soccer_italy_serie_a',     // Serie A
+      'soccer_germany_bundesliga',// Bundesliga
+      'soccer_france_ligue_one',  // Ligue 1
+      'soccer_uefa_champs_league',// Champions League
+      'soccer_brazil_campeonato', // Brasileirão (quando ativo)
+      'soccer_portugal_primeira_liga' // Liga Portugal
+    ];
+    
+    // Regiões expandidas para maximizar chances de arbitragem
+    const regions = 'us,uk,eu,au'; 
+    
+    for (const sportKey of sportKeys) {
+      try {
+        console.log(`📡 Fetching ${sportKey}...`);
+        
+        // Busca odds (que inclui os eventos/jogos)
         const response = await fetch(
-          `${BASE_URL}/sports/${sportKey}/odds/?regions=uk,eu&markets=h2h&apiKey=${apiKey}`
+          `${BASE_URL}/sports/${sportKey}/odds/?regions=${regions}&markets=h2h&oddsFormat=decimal&apiKey=${apiKey}`
         );
 
         if (!response.ok) {
             if (response.status === 401) throw new Error("Chave de API inválida");
             if (response.status === 429) throw new Error("Limite de requisições excedido");
+            // Ignora erros 404 ou outros para não parar o loop
+            console.warn(`Skipping ${sportKey}: API Error ${response.status}`);
             continue;
         }
 
         const events: TheOddsApiEvent[] = await response.json();
-        console.log(`[Real API] Found ${events.length} events for ${sportKey}`);
+        console.log(`✅ Received ${events.length} events for ${sportKey}`);
+        totalEvents += events.length;
 
         // Processar cada evento
         for (const apiEvent of events) {
-          await this.processEvent(apiEvent, sportKey);
+          try {
+            const arbsFound = await this.processEvent(apiEvent, sportKey);
+            if (arbsFound) totalArbs++;
+          } catch (eventError) {
+            console.error(`Error processing event ${apiEvent.id}:`, eventError);
+          }
         }
+      } catch (sportError: any) {
+        // Captura erro de rede (Failed to fetch) ou outros erros específicos DESTA liga
+        // e continua para a próxima liga sem quebrar o processo inteiro.
+        console.error(`❌ Error fetching/processing ${sportKey}:`, sportError.message);
+        errorsCount++;
       }
-
-      return { success: true };
-
-    } catch (error: any) {
-      console.error("[Real API] Error:", error);
-      return { success: false, error: error.message };
     }
+
+    console.log(`🏁 Scan Complete. Analyzed ${totalEvents} events, Found ${totalArbs} Surebets. Errors: ${errorsCount}`);
+    console.groupEnd();
+
+    // Consideramos sucesso se pelo menos uma liga foi processada ou se não houve erro fatal global
+    // Se todas falharem, retornamos erro.
+    if (totalEvents === 0 && errorsCount === sportKeys.length) {
+        return { success: false, error: "Falha ao conectar com todas as ligas. Verifique sua conexão." };
+    }
+
+    return { success: true, events: totalEvents, arbs: totalArbs };
   },
 
-  async processEvent(apiEvent: TheOddsApiEvent, sportKey: string) {
+  async processEvent(apiEvent: TheOddsApiEvent, sportKey: string): Promise<boolean> {
     // 1. Resolver/Criar Esporte
     const isSoccer = sportKey.includes('soccer');
     const sportName = isSoccer ? 'Futebol' : 'Basquete';
@@ -77,11 +113,7 @@ export const theOddsApiService = {
         const { data } = await supabase.from('sports').insert({ name: sportName, key: sportDbKey }).select().single();
         sport = data;
     }
-
-    if (!sport) {
-        console.error(`[Real API] Failed to resolve sport: ${sportDbKey}`);
-        return;
-    }
+    if (!sport) return false;
 
     // 2. Resolver/Criar Liga
     let { data: league } = await supabase.from('leagues').select('id').eq('name', apiEvent.sport_title).single();
@@ -89,23 +121,15 @@ export const theOddsApiService = {
         const { data } = await supabase.from('leagues').insert({ name: apiEvent.sport_title, sport_id: sport.id }).select().single();
         league = data;
     }
-
-    if (!league) {
-        console.error(`[Real API] Failed to resolve league: ${apiEvent.sport_title}`);
-        return;
-    }
+    if (!league) return false;
 
     // 3. Resolver/Criar Times
     const homeTeamId = await this.resolveTeam(apiEvent.home_team, sport.id);
     const awayTeamId = await this.resolveTeam(apiEvent.away_team, sport.id);
 
-    if (!homeTeamId || !awayTeamId) {
-        console.error(`[Real API] Failed to resolve teams: ${apiEvent.home_team} vs ${apiEvent.away_team}`);
-        return;
-    }
+    if (!homeTeamId || !awayTeamId) return false;
 
-    // 4. Upsert Evento (Abordagem Segura para JSONB)
-    // Verifica se o evento já existe pelo ID do provedor dentro do JSON
+    // 4. Upsert Evento
     let { data: event } = await supabase
         .from('events')
         .select('id')
@@ -113,14 +137,13 @@ export const theOddsApiService = {
         .maybeSingle();
 
     if (event) {
-        // Atualiza status e horário se já existe
+        // Atualiza horário e status se mudou
         const { data: updated } = await supabase.from('events').update({
             start_time: apiEvent.commence_time,
             status: new Date(apiEvent.commence_time) < new Date() ? 'live' : 'scheduled',
         }).eq('id', event.id).select().single();
         event = updated;
     } else {
-        // Cria novo se não existe
         const { data: inserted } = await supabase.from('events').insert({
             sport_id: sport.id,
             league_id: league.id,
@@ -133,17 +156,14 @@ export const theOddsApiService = {
         event = inserted;
     }
 
-    if (!event) return;
+    if (!event) return false;
 
-    // 5. Processar Odds e Calcular Arb
-    // Mapear Bookmakers para Legs
+    // 5. Processar Odds
     const legsCandidates: any[] = [];
-    
-    // Mercado H2H (Moneyline ou 1x2)
     const marketType = isSoccer ? 'soccer_1x2_90' : 'basket_ml';
     const ruleSet = isSoccer ? '90min' : 'incl_ot';
 
-    // Criar Mercado no DB (Busca ou Cria)
+    // Criar Mercado
     let { data: market } = await supabase
         .from('markets')
         .select('id')
@@ -161,23 +181,20 @@ export const theOddsApiService = {
         market = newMarket;
     }
 
-    if (!market) return;
+    if (!market) return false;
 
-    // Coletar todas as odds disponíveis para este mercado
+    // Coletar Odds
     for (const book of apiEvent.bookmakers) {
-        // Upsert Bookmaker
         let { data: dbBook } = await supabase.from('books').select('id').eq('key', book.key).single();
         if (!dbBook) {
             const { data } = await supabase.from('books').insert({ name: book.title, key: book.key }).select().single();
             dbBook = data;
         }
-
         if (!dbBook) continue;
 
         const h2h = book.markets.find(m => m.key === 'h2h');
         if (h2h) {
             for (const outcome of h2h.outcomes) {
-                // Normalizar Outcome Key
                 let outcomeKey = 'DRAW';
                 if (outcome.name === apiEvent.home_team) outcomeKey = 'HOME';
                 if (outcome.name === apiEvent.away_team) outcomeKey = 'AWAY';
@@ -185,23 +202,22 @@ export const theOddsApiService = {
                 legsCandidates.push({
                     book_id: dbBook.id,
                     outcome_key: outcomeKey,
-                    odd: outcome.price
+                    odd: outcome.price,
+                    book_name: book.title
                 });
             }
         }
     }
 
-    // 6. Calcular Surebet usando o Engine Compartilhado
-    // Agrupar melhores odds por outcome
-    const bestOdds: Record<string, { odd: number, book_id: string }> = {};
+    // 6. Calcular Surebet
+    const bestOdds: Record<string, { odd: number, book_id: string, book_name: string }> = {};
     
     legsCandidates.forEach(leg => {
         if (!bestOdds[leg.outcome_key] || leg.odd > bestOdds[leg.outcome_key].odd) {
-            bestOdds[leg.outcome_key] = { odd: leg.odd, book_id: leg.book_id };
+            bestOdds[leg.outcome_key] = { odd: leg.odd, book_id: leg.book_id, book_name: leg.book_name };
         }
     });
 
-    // Verificar se temos todos os outcomes necessários
     const requiredOutcomes = isSoccer ? ['HOME', 'DRAW', 'AWAY'] : ['HOME', 'AWAY'];
     const hasAllOutcomes = requiredOutcomes.every(k => bestOdds[k]);
 
@@ -212,11 +228,9 @@ export const theOddsApiService = {
             book_id: bestOdds[k].book_id
         }));
 
-        const result = calculateSurebet(arbLegs, 1000, 0); // ROI min 0 para salvar tudo e filtrar no front
+        const result = calculateSurebet(arbLegs, 1000, 0);
 
         if (result.isArb) {
-            console.log(`[Real API] SUREBET FOUND! ROI: ${(result.roi * 100).toFixed(2)}%`);
-            
             // Salvar Arb
             const { data: arb } = await supabase.from('arbs').insert({
                 market_id: market.id,
@@ -228,7 +242,6 @@ export const theOddsApiService = {
             }).select().single();
 
             if (arb) {
-                // Salvar Legs
                 await supabase.from('arb_legs').insert(
                     result.legs.map(l => ({
                         arb_id: arb.id,
@@ -239,9 +252,12 @@ export const theOddsApiService = {
                         payout_est: 0
                     }))
                 );
+                return true;
             }
         }
     }
+    
+    return false;
   },
 
   async resolveTeam(teamName: string, sportId: string): Promise<string | null> {

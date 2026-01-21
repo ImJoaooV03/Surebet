@@ -4,6 +4,9 @@ import { addSeconds, addMinutes } from "date-fns";
 import { useToast } from "../contexts/ToastContext";
 import { useAuth } from "../contexts/AuthContext";
 import { theOddsApiService } from "../services/theOddsApiService";
+import { rapidApiService } from "../services/rapidApiService";
+import { betsApiService } from "../services/betsApiService";
+import { sportmonksService } from "../services/sportmonksService";
 
 const SAMPLE_TEAMS = {
   soccer: [
@@ -22,28 +25,39 @@ export function MockWorkerService() {
   const workerRef = useRef<NodeJS.Timeout | null>(null);
   const cleanupRef = useRef<NodeJS.Timeout | null>(null);
   const [mode, setMode] = useState<'simulated' | 'real'>('simulated');
+  
+  // API Keys
   const [apiKey, setApiKey] = useState<string | null>(null);
+  const [secApiKey, setSecApiKey] = useState<string | null>(null);
+  const [terApiKey, setTerApiKey] = useState<string | null>(null);
+  const [quatApiKey, setQuatApiKey] = useState<string | null>(null);
 
-  // Check for API Key AND Enabled Status
+  // Check for API Keys AND Enabled Status
   useEffect(() => {
     async function checkSettings() {
       if (!user) return;
       
-      // Busca chave E status de ativação
       const { data } = await supabase
         .from('user_settings')
-        .select('external_api_key, api_enabled')
+        .select('external_api_key, api_enabled, secondary_api_key, secondary_api_enabled, tertiary_api_key, tertiary_api_enabled, quaternary_api_key, quaternary_api_enabled')
         .eq('user_id', user.id)
         .single();
 
-      // Só entra em modo real se tiver chave E estiver ativado (default true)
-      if (data?.external_api_key && data?.api_enabled !== false) {
-        setApiKey(data.external_api_key);
+      const hasPrimary = data?.external_api_key && data?.api_enabled !== false;
+      const hasSecondary = data?.secondary_api_key && data?.secondary_api_enabled === true;
+      const hasTertiary = data?.tertiary_api_key && data?.tertiary_api_enabled === true;
+      const hasQuaternary = data?.quaternary_api_key && data?.quaternary_api_enabled === true;
+
+      if (hasPrimary || hasSecondary || hasTertiary || hasQuaternary) {
+        setApiKey(hasPrimary ? data.external_api_key : null);
+        setSecApiKey(hasSecondary ? data.secondary_api_key : null);
+        setTerApiKey(hasTertiary ? data.tertiary_api_key : null);
+        setQuatApiKey(hasQuaternary ? data.quaternary_api_key : null);
         setMode('real');
-        console.log("[Worker] Switched to REAL MODE using The-Odds-API");
+        console.log(`[Worker] REAL MODE Active. P:${hasPrimary} S:${hasSecondary} T:${hasTertiary} Q:${hasQuaternary}`);
       } else {
         setMode('simulated');
-        console.log("[Worker] Running in SIMULATION MODE (API Paused or Missing Key)");
+        console.log("[Worker] Running in SIMULATION MODE");
       }
     }
     checkSettings();
@@ -65,22 +79,31 @@ export function MockWorkerService() {
   // --- WORKER LOOP ---
   useEffect(() => {
     const runLoop = async () => {
-      if (mode === 'real' && apiKey) {
+      if (mode === 'real') {
         // --- REAL MODE ---
-        const result = await theOddsApiService.fetchAndProcessOdds(apiKey);
-        
-        if (!result.success) {
-          console.error("API Fetch Error:", result.error);
-          
-          if (result.error?.includes("401") || result.error?.includes("Chave")) {
-             toast("Erro API: Chave Inválida. Voltando para simulação.", "error");
-             setMode('simulated');
-          } else if (result.error?.includes("429")) {
-             toast("Erro API: Limite de requisições excedido.", "warning");
-          } else {
-             console.warn("API temporariamente indisponível, tentando novamente em breve.");
+        // 1. Executa API Principal
+        if (apiKey) {
+          const result = await theOddsApiService.fetchAndProcessOdds(apiKey);
+          if (!result.success && result.error?.includes("401")) {
+             toast("Erro API Principal: Chave Inválida", "error");
           }
         }
+
+        // 2. Executa API Secundária (se configurada)
+        if (secApiKey) {
+           await rapidApiService.fetchAndProcessOdds(secApiKey);
+        }
+
+        // 3. Executa API Terciária (se configurada)
+        if (terApiKey) {
+           await betsApiService.fetchAndProcessOdds(terApiKey);
+        }
+
+        // 4. Executa API Quaternária (se configurada)
+        if (quatApiKey) {
+           await sportmonksService.fetchAndProcessOdds(quatApiKey);
+        }
+
       } else {
         // --- SIMULATION MODE ---
         await runSimulation();
@@ -98,7 +121,7 @@ export function MockWorkerService() {
       if (workerRef.current) clearInterval(workerRef.current);
       if (cleanupRef.current) clearInterval(cleanupRef.current);
     };
-  }, [mode, apiKey, toast]);
+  }, [mode, apiKey, secApiKey, terApiKey, quatApiKey, toast]);
 
   // --- SIMULATION LOGIC ---
   const runSimulation = async () => {
