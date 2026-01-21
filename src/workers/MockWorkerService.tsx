@@ -5,14 +5,6 @@ import { useToast } from "../contexts/ToastContext";
 import { useAuth } from "../contexts/AuthContext";
 import { theOddsApiService } from "../services/theOddsApiService";
 
-/**
- * DATA INGESTION WORKER (HYBRID)
- * 
- * Modes:
- * 1. REAL MODE: If user has API Key, fetches from The-Odds-API.
- * 2. SIMULATION MODE: If no key, generates mock data.
- */
-
 const SAMPLE_TEAMS = {
   soccer: [
     ['Arsenal', 'Chelsea'], ['Man City', 'Liverpool'], ['Real Madrid', 'Barcelona'],
@@ -32,18 +24,26 @@ export function MockWorkerService() {
   const [mode, setMode] = useState<'simulated' | 'real'>('simulated');
   const [apiKey, setApiKey] = useState<string | null>(null);
 
-  // Check for API Key on mount/user change
+  // Check for API Key AND Enabled Status
   useEffect(() => {
     async function checkSettings() {
       if (!user) return;
-      const { data } = await supabase.from('user_settings').select('external_api_key').eq('user_id', user.id).single();
-      if (data?.external_api_key) {
+      
+      // Busca chave E status de ativação
+      const { data } = await supabase
+        .from('user_settings')
+        .select('external_api_key, api_enabled')
+        .eq('user_id', user.id)
+        .single();
+
+      // Só entra em modo real se tiver chave E estiver ativado (default true)
+      if (data?.external_api_key && data?.api_enabled !== false) {
         setApiKey(data.external_api_key);
         setMode('real');
         console.log("[Worker] Switched to REAL MODE using The-Odds-API");
       } else {
         setMode('simulated');
-        console.log("[Worker] Running in SIMULATION MODE");
+        console.log("[Worker] Running in SIMULATION MODE (API Paused or Missing Key)");
       }
     }
     checkSettings();
@@ -67,20 +67,17 @@ export function MockWorkerService() {
     const runLoop = async () => {
       if (mode === 'real' && apiKey) {
         // --- REAL MODE ---
-        // Fetch less frequently to save quota (every 60s)
         const result = await theOddsApiService.fetchAndProcessOdds(apiKey);
         
         if (!result.success) {
           console.error("API Fetch Error:", result.error);
           
-          // Tratamento inteligente de erros da API
           if (result.error?.includes("401") || result.error?.includes("Chave")) {
              toast("Erro API: Chave Inválida. Voltando para simulação.", "error");
-             setMode('simulated'); // Fallback automático
+             setMode('simulated');
           } else if (result.error?.includes("429")) {
              toast("Erro API: Limite de requisições excedido.", "warning");
           } else {
-             // Erros de rede temporários não mudam o modo, apenas avisam
              console.warn("API temporariamente indisponível, tentando novamente em breve.");
           }
         }
@@ -90,13 +87,11 @@ export function MockWorkerService() {
       }
     };
 
-    // Interval depends on mode
-    const intervalMs = mode === 'real' ? 60000 : 15000; // 60s real, 15s sim
+    const intervalMs = mode === 'real' ? 60000 : 15000;
     
     workerRef.current = setInterval(runLoop, intervalMs);
     cleanupRef.current = setInterval(runCleanup, 30000);
 
-    // Run immediately once
     runLoop();
 
     return () => {
@@ -108,7 +103,6 @@ export function MockWorkerService() {
   // --- SIMULATION LOGIC ---
   const runSimulation = async () => {
     try {
-        // Ensure basic data exists
         let { data: soccer } = await supabase.from('sports').select('id').eq('key', 'soccer').single();
         if (!soccer) return;
 
@@ -125,7 +119,6 @@ export function MockWorkerService() {
 
         const isLive = Math.random() > 0.7;
         
-        // Aumentado o range de tempo para até 48h (aprox 2880 min) para testar o filtro
         const { data: event } = await supabase.from('events').insert({
           sport_id: soccer.id,
           start_time: isLive ? addMinutes(new Date(), -15).toISOString() : addMinutes(new Date(), Math.floor(Math.random() * 3000)).toISOString(),
@@ -158,9 +151,7 @@ export function MockWorkerService() {
           expires_at: addSeconds(new Date(), 60).toISOString()
         }).select().single();
 
-        // Add dummy legs for the simulation to show up in UI
         if (arb) {
-           // Fetch some books
            const { data: books } = await supabase.from('books').select('id').limit(3);
            if (books && books.length >= 3) {
              const outcomes = ['HOME', 'DRAW', 'AWAY'];
@@ -169,7 +160,7 @@ export function MockWorkerService() {
                   arb_id: arb.id,
                   book_id: books[idx].id,
                   outcome_key: outcome,
-                  odd_value: 3.0, // Dummy value
+                  odd_value: 3.0,
                   stake_value: 0
                 })
              );

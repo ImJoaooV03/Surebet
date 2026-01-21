@@ -20,8 +20,9 @@ export interface Database {
           freshness_live_sec: number
           freshness_pre_sec: number
           cooldown_sec: number
-          channels: Json | null // JSONB column for integrations
+          channels: Json | null
           external_api_key: string | null
+          api_enabled: boolean // Nova coluna
         }
         Insert: {
           user_id: string
@@ -35,6 +36,7 @@ export interface Database {
           cooldown_sec?: number
           channels?: Json | null
           external_api_key?: string | null
+          api_enabled?: boolean
         }
         Update: {
           user_id?: string
@@ -48,6 +50,7 @@ export interface Database {
           cooldown_sec?: number
           channels?: Json | null
           external_api_key?: string | null
+          api_enabled?: boolean
         }
       }
       arbs: {

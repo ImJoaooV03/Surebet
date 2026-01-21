@@ -1,4 +1,4 @@
-import { Save, MessageCircle, Smartphone, Loader2, Key, Globe } from "lucide-react";
+import { Save, MessageCircle, Smartphone, Loader2, Key, Globe, Power, PauseCircle, PlayCircle } from "lucide-react";
 import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../contexts/AuthContext";
@@ -18,6 +18,7 @@ export function Settings() {
   const [telegramEnabled, setTelegramEnabled] = useState(false);
   const [whatsappEnabled, setWhatsappEnabled] = useState(false);
   const [apiKey, setApiKey] = useState("");
+  const [apiEnabled, setApiEnabled] = useState(true); // Novo estado
 
   useEffect(() => {
     if (!user) return;
@@ -40,12 +41,12 @@ export function Settings() {
           setStakePercent(data.stake_percent_value);
           setRoiMin(data.roi_min);
           
-          // Correção: Ler do objeto JSON 'channels'
           const channels = data.channels as any || {};
           setTelegramEnabled(channels.telegram || false);
           setWhatsappEnabled(channels.whatsapp || false);
           
           setApiKey(data.external_api_key || "");
+          setApiEnabled(data.api_enabled !== false); // Default true se null
         }
       } catch (err) {
         console.error("Error loading settings:", err);
@@ -69,12 +70,12 @@ export function Settings() {
         stake_mode: stakeMode,
         stake_percent_value: stakePercent,
         roi_min: roiMin,
-        // Correção: Salvar dentro do objeto JSON 'channels'
         channels: {
           telegram: telegramEnabled,
           whatsapp: whatsappEnabled
         },
-        external_api_key: apiKey
+        external_api_key: apiKey,
+        api_enabled: apiEnabled // Salvando novo estado
       };
 
       const { error } = await supabase
@@ -84,7 +85,6 @@ export function Settings() {
       if (error) throw error;
       
       toast("Configurações salvas com sucesso!", "success");
-      // Recarrega a página para o Worker pegar a nova chave
       setTimeout(() => window.location.reload(), 1000);
       
     } catch (err: any) {
@@ -112,28 +112,42 @@ export function Settings() {
         <section className="bg-slate-950 border border-slate-800 rounded-xl p-6 relative overflow-hidden">
           <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none"></div>
           
-          <h2 className="text-lg font-semibold text-slate-200 mb-4 flex items-center gap-2">
-            <span className="w-1 h-6 bg-purple-500 rounded-full"></span>
-            Provedor de Dados (Odds Reais)
-          </h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-slate-200 flex items-center gap-2">
+              <span className="w-1 h-6 bg-purple-500 rounded-full"></span>
+              Provedor de Dados (Odds Reais)
+            </h2>
+            
+            {/* Toggle Button */}
+            <button
+              onClick={() => setApiEnabled(!apiEnabled)}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${
+                apiEnabled 
+                  ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/30" 
+                  : "bg-slate-800 text-slate-400 border border-slate-700 hover:bg-slate-700"
+              }`}
+            >
+              {apiEnabled ? <PlayCircle className="w-4 h-4" /> : <PauseCircle className="w-4 h-4" />}
+              {apiEnabled ? "INTEGRAÇÃO ATIVA" : "INTEGRAÇÃO PAUSADA"}
+            </button>
+          </div>
           
           <div className="space-y-4">
-            <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-800">
+            <div className={`bg-slate-900/50 p-4 rounded-lg border transition-colors ${apiEnabled ? 'border-slate-800' : 'border-amber-500/20 bg-amber-500/5'}`}>
               <div className="flex items-start gap-3">
-                <Globe className="w-5 h-5 text-purple-400 mt-1" />
+                <Globe className={`w-5 h-5 mt-1 ${apiEnabled ? 'text-purple-400' : 'text-slate-500'}`} />
                 <div>
                   <h3 className="text-sm font-medium text-slate-200">The-Odds-API</h3>
                   <p className="text-xs text-slate-500 mt-1">
-                    Para obter odds reais, você precisa de uma chave de API. 
-                    <a href="https://the-odds-api.com/" target="_blank" rel="noreferrer" className="text-emerald-400 hover:underline ml-1">
-                      Obter chave grátis aqui
-                    </a>.
+                    {apiEnabled 
+                      ? "O sistema buscará odds reais a cada 60 segundos." 
+                      : "A busca de odds reais está PAUSADA. O sistema rodará em modo de simulação."}
                   </p>
                 </div>
               </div>
             </div>
 
-            <div className="space-y-2">
+            <div className={`space-y-2 transition-opacity ${apiEnabled ? 'opacity-100' : 'opacity-50 pointer-events-none'}`}>
               <label className="text-sm font-medium text-slate-400 flex items-center gap-2">
                 <Key className="w-4 h-4" /> Chave de API
               </label>
