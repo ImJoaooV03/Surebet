@@ -4,12 +4,12 @@ export interface ArbLeg {
   bookmaker: string;
   outcome: string;
   odd: number;
-  stake_percent: number; // Vem calculado do backend (0.0 to 1.0)
-  suggestedStake?: number; // Calculado no frontend baseado na banca
+  stake_percent: number;
+  suggestedStake?: number;
 }
 
 export interface Surebet {
-  id: string; // Convertido de bigint para string no frontend
+  id: string;
   sport: string;
   league: string;
   homeTeam: string;
@@ -17,10 +17,23 @@ export interface Surebet {
   market: string;
   startTime: Date;
   isLive: boolean;
-  bucket: string; // LIVE, PRE_HOT, PRE_MID, PRE_LONG
+  bucket: string;
   roi: number;
   legs: ArbLeg[];
   createdAt: Date;
+}
+
+// Interface específica para o Histórico de Oportunidades (Log do Sistema)
+export interface SurebetOpportunity {
+  id: string;
+  detectedAt: string; // ISO String
+  sport: string;
+  event: string; // "Time A vs Time B"
+  market: string;
+  roi: number;
+  bookmakers: string[]; // ["Bet365", "Pinnacle"]
+  odds: string[]; // ["1.90", "2.10"]
+  status: 'active' | 'expired';
 }
 
 export interface GameEvent {

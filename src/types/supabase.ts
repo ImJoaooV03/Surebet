@@ -65,6 +65,10 @@ export interface Database {
           api_enabled?: boolean
           secondary_api_key?: string | null
           secondary_api_enabled?: boolean
+          alert_preferences?: Json | null
+          telegram_chat_id?: string | null
+          bookmaker_settings?: Json | null
+          market_settings?: Json | null
         }
         Insert: {
           user_id: string
@@ -76,6 +80,14 @@ export interface Database {
           is_premium?: boolean
           plan?: 'basic' | 'pro' | 'premium'
           role?: string
+          external_api_key?: string | null
+          api_enabled?: boolean
+          secondary_api_key?: string | null
+          secondary_api_enabled?: boolean
+          alert_preferences?: Json | null
+          telegram_chat_id?: string | null
+          bookmaker_settings?: Json | null
+          market_settings?: Json | null
         }
         Update: {
           user_id?: string
@@ -87,6 +99,58 @@ export interface Database {
           is_premium?: boolean
           plan?: 'basic' | 'pro' | 'premium'
           role?: string
+          external_api_key?: string | null
+          api_enabled?: boolean
+          secondary_api_key?: string | null
+          secondary_api_enabled?: boolean
+          alert_preferences?: Json | null
+          telegram_chat_id?: string | null
+          bookmaker_settings?: Json | null
+          market_settings?: Json | null
+        }
+      }
+      bets: {
+        Row: {
+          id: string
+          user_id: string
+          event_date: string
+          event_name: string
+          market: string
+          selection: string
+          odds: number
+          stake: number
+          status: 'pending' | 'won' | 'lost' | 'void' | 'cashout'
+          return_value: number
+          notes: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          event_date?: string
+          event_name: string
+          market: string
+          selection: string
+          odds: number
+          stake: number
+          status?: 'pending' | 'won' | 'lost' | 'void' | 'cashout'
+          return_value?: number
+          notes?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          event_date?: string
+          event_name?: string
+          market?: string
+          selection?: string
+          odds?: number
+          stake?: number
+          status?: 'pending' | 'won' | 'lost' | 'void' | 'cashout'
+          return_value?: number
+          notes?: string | null
+          created_at?: string
         }
       }
       opportunities: { Row: {} } // Placeholder

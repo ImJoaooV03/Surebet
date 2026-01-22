@@ -59,7 +59,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     // Check active session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(({ data: { session }, error }) => {
+      // CORREÇÃO: Se o token for inválido (usuário deletado ou token expirado), faz logout forçado
+      if (error) {
+        console.warn('Session validation failed, signing out:', error.message);
+        supabase.auth.signOut(); // Limpa tokens inválidos do localStorage
+        setSession(null);
+        setUser(null);
+        setLoading(false);
+        return;
+      }
+
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {

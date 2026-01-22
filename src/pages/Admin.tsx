@@ -10,6 +10,7 @@ export default function AdminLayout() {
   // Títulos dinâmicos baseados na rota
   const titles: Record<string, { title: string; subtitle: string }> = {
     system: { title: 'Ativação do Sistema', subtitle: 'Configure a chave mestra e os robôs de execução.' },
+    metrics: { title: 'Métricas da API', subtitle: 'Monitoramento de uso, cotas e filas de processamento.' },
     integrations: { title: 'Conexões de Dados', subtitle: 'Gerencie as chaves de API externas.' },
     scanner: { title: 'Scanner em Tempo Real', subtitle: 'Visualize as oportunidades cruas chegando no banco.' },
     codes: { title: 'Gerenciador de Códigos', subtitle: 'Crie e gerencie códigos de acesso para planos.' },

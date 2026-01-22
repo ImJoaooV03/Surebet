@@ -55,12 +55,12 @@ export default function Register() {
       if (error) throw error;
 
       if (data.user) {
-        // 2. O trigger do banco deve criar o user_settings, mas garantimos o update do plano aqui se necessário
-        // ou confiamos no default 'basic' da migração.
+        toast("Conta criada com sucesso! Escolha seu plano.", "success");
         
-        toast("Conta criada com sucesso!", "success");
-        
-        // Redirecionar para a página de Planos
+        // REDIRECIONAMENTO CRÍTICO:
+        // Força o usuário a ir para a tela de Planos imediatamente após o cadastro.
+        // Como o plano inicial é 'basic', o SubscriptionRoute impediria o acesso ao Dashboard de qualquer forma,
+        // mas navegar diretamente melhora a UX.
         navigate("/plans");
       }
     } catch (err: any) {

@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { useToast } from "../contexts/ToastContext";
 import { AuthLayout } from "../components/auth/AuthLayout";
-import { Mail, Lock, Eye, EyeOff, Loader2, ArrowRight, AlertCircle, AlertTriangle } from "lucide-react";
+import { Mail, Lock, Eye, EyeOff, Loader2, ArrowRight, AlertCircle } from "lucide-react";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -89,16 +89,6 @@ export default function Login() {
             <div className="flex-1">
               <span className="font-bold block mb-1">Erro de Acesso</span>
               <span>{error}</span>
-            </div>
-          </div>
-        )}
-
-        {/* Aviso para ambiente de desenvolvimento */}
-        {import.meta.env.DEV && (
-          <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg flex items-start gap-3 text-xs text-blue-300">
-            <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-            <div>
-              <strong>Nota de Desenvolvimento:</strong> Se você criou um usuário no painel Admin localmente, ele pode não existir no Supabase real. Certifique-se de usar um usuário real.
             </div>
           </div>
         )}

@@ -7,10 +7,19 @@ interface EmptyStateProps {
   description: string;
   actionLabel?: string;
   actionLink?: string;
+  onAction?: () => void; // Adicionado suporte para função de callback
 }
 
-export function EmptyState({ icon: Icon, title, description, actionLabel, actionLink }: EmptyStateProps) {
+export function EmptyState({ icon: Icon, title, description, actionLabel, actionLink, onAction }: EmptyStateProps) {
   const navigate = useNavigate();
+
+  const handleClick = () => {
+    if (onAction) {
+      onAction();
+    } else if (actionLink) {
+      navigate(actionLink);
+    }
+  };
 
   return (
     <div className="col-span-full py-16 px-6 text-center bg-slate-950/50 rounded-xl border border-slate-800 border-dashed flex flex-col items-center justify-center gap-4 animate-in fade-in duration-500">
@@ -27,7 +36,7 @@ export function EmptyState({ icon: Icon, title, description, actionLabel, action
 
       {actionLabel && (
         <button 
-          onClick={() => actionLink ? navigate(actionLink) : null}
+          onClick={handleClick}
           className="mt-2 inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold rounded-lg transition-all shadow-lg shadow-emerald-900/20 active:scale-95"
         >
           {actionLink === '/settings' && <Settings className="w-4 h-4" />}
