@@ -1,7 +1,112 @@
-const API_BASE = '/api';
+import { generateId } from "./utils";
 
-// Mock data para desenvolvimento local (quando Vercel Functions não estão disponíveis)
-const getMockData = (endpoint: string) => {
+const API_BASE = '/api';
+const MOCK_STORAGE_KEY = 'dualite_mock_users_db_v1';
+
+// Dados iniciais para quando o storage estiver vazio
+const INITIAL_MOCK_USERS = [
+  {
+    id: 'mock-u-1',
+    email: 'joao@email.com',
+    full_name: 'João Silva',
+    role: 'admin',
+    plan: 'premium',
+    status: 'active',
+    created_at: new Date().toISOString(),
+    last_login: new Date().toISOString()
+  },
+  {
+    id: 'mock-u-2',
+    email: 'maria@empresa.com',
+    full_name: 'Maria Souza',
+    role: 'user',
+    plan: 'pro',
+    status: 'active',
+    created_at: new Date(Date.now() - 86400000 * 5).toISOString(),
+    last_login: new Date(Date.now() - 86400000).toISOString()
+  },
+  {
+    id: 'mock-u-3',
+    email: 'carlos@teste.com',
+    full_name: 'Carlos Oliveira',
+    role: 'user',
+    plan: 'basic',
+    status: 'suspended',
+    created_at: new Date(Date.now() - 86400000 * 20).toISOString(),
+    last_login: null
+  }
+];
+
+// Helper para gerenciar o "Banco de Dados Local"
+const getLocalUsers = () => {
+  try {
+    const stored = localStorage.getItem(MOCK_STORAGE_KEY);
+    if (!stored) {
+      localStorage.setItem(MOCK_STORAGE_KEY, JSON.stringify(INITIAL_MOCK_USERS));
+      return INITIAL_MOCK_USERS;
+    }
+    return JSON.parse(stored);
+  } catch (e) {
+    return INITIAL_MOCK_USERS;
+  }
+};
+
+const saveLocalUsers = (users: any[]) => {
+  localStorage.setItem(MOCK_STORAGE_KEY, JSON.stringify(users));
+};
+
+// Mock data para outras rotas
+const getMockData = (endpoint: string, options?: RequestInit) => {
+  // --- MOCK INTELIGENTE PARA USUÁRIOS (PERSISTENTE) ---
+  if (endpoint.includes('/admin/users')) {
+    const users = getLocalUsers();
+    const method = options?.method || 'GET';
+
+    // 1. LISTAR (GET)
+    if (method === 'GET') {
+      return users;
+    }
+
+    // 2. CRIAR (POST)
+    if (method === 'POST') {
+      const body = JSON.parse(options?.body as string || '{}');
+      const newUser = {
+        id: `mock-u-${Date.now()}`,
+        created_at: new Date().toISOString(),
+        last_login: null,
+        status: 'active',
+        ...body
+      };
+      const updatedUsers = [newUser, ...users];
+      saveLocalUsers(updatedUsers);
+      return { success: true, user: newUser };
+    }
+
+    // 3. ATUALIZAR (PUT)
+    if (method === 'PUT') {
+      const body = JSON.parse(options?.body as string || '{}');
+      const updatedUsers = users.map((u: any) => 
+        u.id === body.id ? { ...u, ...body } : u
+      );
+      saveLocalUsers(updatedUsers);
+      return { success: true };
+    }
+
+    // 4. EXCLUIR (DELETE)
+    if (method === 'DELETE') {
+      // Extrair ID da query string (ex: /admin/users?id=123)
+      const idMatch = endpoint.match(/id=([^&]+)/);
+      const idToDelete = idMatch ? idMatch[1] : null;
+      
+      if (idToDelete) {
+        const updatedUsers = users.filter((u: any) => u.id !== idToDelete);
+        saveLocalUsers(updatedUsers);
+        return { success: true };
+      }
+    }
+  }
+
+  // --- MOCKS ESTÁTICOS PARA OUTRAS ROTAS ---
   if (endpoint.includes('status') || endpoint.includes('dashboard')) {
     return {
       budget: [
@@ -14,6 +119,7 @@ const getMockData = (endpoint: string) => {
       cronToken: 'dev-token-placeholder-123'
     };
   }
+  
   if (endpoint.includes('opportunities')) {
     return [
       {
@@ -55,7 +161,6 @@ const getMockData = (endpoint: string) => {
     ];
   }
 
-  // FIX: Mock data for events to prevent map error
   if (endpoint.includes('events')) {
     return [
       {
@@ -102,8 +207,8 @@ export async function apiRequest<T>(endpoint: string, options?: RequestInit): Pr
     // Isso acontece localmente porque as Vercel Functions não rodam no WebContainer.
     const contentType = res.headers.get("content-type");
     if (!contentType || !contentType.includes("application/json")) {
-      console.warn(`[Local Dev] Endpoint ${endpoint} retornou HTML/Texto. Usando dados simulados.`);
-      return getMockData(endpoint) as unknown as T;
+      console.warn(`[Local Dev] Endpoint ${endpoint} retornou HTML/Texto. Usando dados simulados persistentes.`);
+      return getMockData(endpoint, options) as unknown as T;
     }
 
     if (!res.ok) {
@@ -115,6 +220,6 @@ export async function apiRequest<T>(endpoint: string, options?: RequestInit): Pr
   } catch (error) {
     console.error(`API Request Error (${endpoint}):`, error);
     // Fallback silencioso para evitar tela branca em dev
-    return getMockData(endpoint) as unknown as T;
+    return getMockData(endpoint, options) as unknown as T;
   }
 }

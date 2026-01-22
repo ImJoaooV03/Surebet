@@ -21,15 +21,13 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          {/* Título removido visualmente para bater com o print, ou mantido menor se preferir */}
-          <p className="text-slate-400 text-lg">Visão geral das operações de arbitragem em tempo real.</p>
-        </div>
+      {/* Cabeçalho do Dashboard */}
+      <div>
+        <p className="text-slate-400 text-base md:text-lg">Visão geral das operações de arbitragem em tempo real.</p>
       </div>
 
-      {/* KPI Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      {/* KPI Grid - Responsivo: 1 coluna (mobile), 2 (tablet), 4 (desktop) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
         <KpiCard 
           title="Lucro Estimado (Hoje)" 
           value="R$ 145,50" 
@@ -59,19 +57,21 @@ export default function Dashboard() {
         />
       </div>
 
-      {/* Main Content Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      {/* Main Content Grid - Responsivo: Stack vertical (mobile), 3 colunas (desktop) */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
         
-        {/* Recent Opportunities Table */}
-        <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-lg">
+        {/* Recent Opportunities Table - Ocupa 2 colunas no desktop */}
+        <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-lg flex flex-col">
           <div className="p-6 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
             <h3 className="text-lg font-bold text-white">Oportunidades Recentes</h3>
             <Link to="/opportunities" className="text-xs font-bold text-indigo-400 hover:text-indigo-300 flex items-center gap-1 transition-colors">
               Ver Todas <ArrowRight size={14} />
             </Link>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm text-slate-400">
+          
+          {/* Container com scroll horizontal para tabelas em mobile */}
+          <div className="overflow-x-auto w-full">
+            <table className="w-full text-left text-sm text-slate-400 min-w-[600px]">
               <thead className="bg-slate-950/30 text-slate-500 uppercase text-[11px] font-bold tracking-wider">
                 <tr>
                   <th className="px-6 py-4">Evento</th>
@@ -83,24 +83,24 @@ export default function Dashboard() {
               <tbody className="divide-y divide-slate-800/50">
                 <tr className="hover:bg-slate-800/30 transition-colors group">
                   <td className="px-6 py-4">
-                    <div className="font-bold text-slate-200 group-hover:text-white transition-colors">Lakers vs Warriors</div>
+                    <div className="font-bold text-slate-200 group-hover:text-white transition-colors whitespace-nowrap">Lakers vs Warriors</div>
                     <div className="text-xs text-slate-500">NBA • Totals</div>
                   </td>
-                  <td className="px-6 py-4">Bet365 / Pinnacle</td>
+                  <td className="px-6 py-4 whitespace-nowrap">Bet365 / Pinnacle</td>
                   <td className="px-6 py-4 text-emerald-400 font-bold font-mono">2.5%</td>
                   <td className="px-6 py-4 text-right">
-                    <span className="px-3 py-1 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded-full text-xs font-bold">Ao Vivo</span>
+                    <span className="px-3 py-1 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded-full text-xs font-bold whitespace-nowrap">Ao Vivo</span>
                   </td>
                 </tr>
                 <tr className="hover:bg-slate-800/30 transition-colors group">
                   <td className="px-6 py-4">
-                    <div className="font-bold text-slate-200 group-hover:text-white transition-colors">Flamengo vs Vasco</div>
+                    <div className="font-bold text-slate-200 group-hover:text-white transition-colors whitespace-nowrap">Flamengo vs Vasco</div>
                     <div className="text-xs text-slate-500">Brasileirão • 1x2</div>
                   </td>
-                  <td className="px-6 py-4">Betano / Sportingbet</td>
+                  <td className="px-6 py-4 whitespace-nowrap">Betano / Sportingbet</td>
                   <td className="px-6 py-4 text-emerald-400 font-bold font-mono">1.8%</td>
                   <td className="px-6 py-4 text-right">
-                    <span className="px-3 py-1 bg-slate-800 text-slate-400 border border-slate-700 rounded-full text-xs font-bold">Pré-jogo</span>
+                    <span className="px-3 py-1 bg-slate-800 text-slate-400 border border-slate-700 rounded-full text-xs font-bold whitespace-nowrap">Pré-jogo</span>
                   </td>
                 </tr>
               </tbody>
@@ -108,7 +108,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* API Usage & Queue Stats */}
+        {/* API Usage & Queue Stats - Ocupa 1 coluna no desktop */}
         <div className="space-y-6">
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-lg">
             <h3 className="text-lg font-bold text-white mb-6 flex items-center gap-2">

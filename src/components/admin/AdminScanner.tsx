@@ -21,37 +21,29 @@ export function AdminScanner() {
   const fetchScannerData = async () => {
     setRefreshing(true);
     try {
-      // Fetch raw data without user-level filters to see EVERYTHING
+      // Fetch raw data from the correct 'opportunities' table (V2 Schema)
       const { data, error } = await supabase
-        .from('arbs')
+        .from('opportunities')
         .select(`
           *,
-          arb_legs (
-            outcome_key,
-            odd_value,
-            books (name)
-          ),
-          markets (
-            market_type,
-            rule_set,
-            line_value,
-            events (
-              start_time,
-              status,
-              leagues (name),
-              sports (name),
-              teams_home: home_team_id (name),
-              teams_away: away_team_id (name)
-            )
+          events (
+            home_name,
+            away_name,
+            start_time_utc,
+            league_id,
+            status,
+            sport_key
           )
         `)
-        .eq('status', 'active')
         .order('roi', { ascending: false })
         .limit(100);
 
       if (error) throw error;
+      
       if (data) {
-        setArbs(data.map(transformArbData));
+        // Transform the raw DB data into the UI Surebet model
+        const transformedData = data.map(item => transformArbData(item));
+        setArbs(transformedData);
       }
     } catch (err) {
       console.error("Scanner error:", err);
@@ -88,18 +80,18 @@ export function AdminScanner() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-4 bg-slate-950 p-4 rounded-xl border border-slate-800">
-        <div className="flex items-center gap-2 text-slate-400">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-slate-950 p-4 rounded-xl border border-slate-800">
+        <div className="flex items-center gap-2 text-slate-400 w-full sm:w-auto">
           <Search className="w-4 h-4" />
           <input 
             type="text" 
             placeholder="Filtrar eventos..." 
             value={filter}
             onChange={e => setFilter(e.target.value)}
-            className="bg-transparent border-none focus:ring-0 text-sm text-slate-200 placeholder:text-slate-600 w-64"
+            className="bg-transparent border-none focus:ring-0 text-sm text-slate-200 placeholder:text-slate-600 w-full sm:w-64"
           />
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
           <Badge variant="outline" className="font-mono">{arbs.length} Oportunidades</Badge>
           <button 
             onClick={fetchScannerData} 
@@ -114,7 +106,7 @@ export function AdminScanner() {
 
       <div className="bg-slate-950 border border-slate-800 rounded-xl overflow-hidden shadow-xl">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left">
+          <table className="w-full text-sm text-left min-w-[800px]">
             <thead className="text-xs text-slate-500 uppercase bg-slate-900/80 border-b border-slate-800">
               <tr>
                 <th className="px-6 py-3 cursor-pointer hover:text-emerald-400" onClick={() => handleSort('startTime')}>
@@ -138,15 +130,15 @@ export function AdminScanner() {
 
                   return (
                     <tr key={arb.id} className="hover:bg-slate-900/40 transition-colors">
-                      <td className="px-6 py-4 font-mono text-slate-400 text-xs">
+                      <td className="px-6 py-4 font-mono text-slate-400 text-xs whitespace-nowrap">
                         {format(arb.startTime, "dd/MM HH:mm")}
                         {arb.isLive && <span className="ml-2 text-red-500 font-bold">LIVE</span>}
                       </td>
                       <td className="px-6 py-4">
-                        <div className="font-bold text-slate-200">{arb.homeTeam} x {arb.awayTeam}</div>
-                        <div className="text-xs text-slate-500">{arb.league} • {arb.sport}</div>
+                        <div className="font-bold text-slate-200 whitespace-nowrap">{arb.homeTeam} x {arb.awayTeam}</div>
+                        <div className="text-xs text-slate-500 whitespace-nowrap">{arb.league} • {arb.sport}</div>
                       </td>
-                      <td className="px-6 py-4 text-slate-400">
+                      <td className="px-6 py-4 text-slate-400 whitespace-nowrap">
                         {arb.market}
                       </td>
                       

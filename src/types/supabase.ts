@@ -9,172 +9,45 @@ export type Json =
 export interface Database {
   public: {
     Tables: {
-      app_settings: {
+      activation_codes: {
         Row: {
-          id: number
-          apisports_key: string | null
-          cron_token: string | null
-          sports_enabled: Json | null
-          roi_min_pre: number
-          roi_min_live: number
-          updated_at: string
-        }
-        Insert: {
-          id?: number
-          apisports_key?: string | null
-          cron_token?: string | null
-          sports_enabled?: Json | null
-          roi_min_pre?: number
-          roi_min_live?: number
-          updated_at?: string
-        }
-        Update: {
-          id?: number
-          apisports_key?: string | null
-          cron_token?: string | null
-          sports_enabled?: Json | null
-          roi_min_pre?: number
-          roi_min_live?: number
-          updated_at?: string
-        }
-      }
-      request_budget: {
-        Row: {
-          day: string
-          sport_key: string
-          used: number
-        }
-        Insert: {
-          day: string
-          sport_key: string
-          used?: number
-        }
-        Update: {
-          day?: string
-          sport_key?: string
-          used?: number
-        }
-      }
-      events: {
-        Row: {
-          id: number
-          sport_key: string
-          provider_event_id: string
-          league_id: string | null
-          start_time_utc: string
-          home_name: string
-          away_name: string
-          status: string
-          score_json: Json | null
-          updated_at: string
-        }
-        Insert: {
-          id?: number
-          sport_key: string
-          provider_event_id: string
-          league_id?: string | null
-          start_time_utc: string
-          home_name: string
-          away_name: string
-          status?: string
-          score_json?: Json | null
-          updated_at?: string
-        }
-        Update: {
-          id?: number
-          sport_key?: string
-          provider_event_id?: string
-          league_id?: string | null
-          start_time_utc?: string
-          home_name?: string
-          away_name?: string
-          status?: string
-          score_json?: Json | null
-          updated_at?: string
-        }
-      }
-      event_queue: {
-        Row: {
-          event_id: number
-          bucket: string
-          priority_score: number
-          last_odds_fetch_at: string | null
-          updated_at: string
-        }
-        Insert: {
-          event_id: number
-          bucket: string
-          priority_score?: number
-          last_odds_fetch_at?: string | null
-          updated_at?: string
-        }
-        Update: {
-          event_id?: number
-          bucket?: string
-          priority_score?: number
-          last_odds_fetch_at?: string | null
-          updated_at?: string
-        }
-      }
-      odds_snapshots: {
-        Row: {
-          event_id: number
-          snapshot_hash: string
-          snapshot_json: Json
-          updated_at: string
-        }
-        Insert: {
-          event_id: number
-          snapshot_hash: string
-          snapshot_json: Json
-          updated_at?: string
-        }
-        Update: {
-          event_id?: number
-          snapshot_hash?: string
-          snapshot_json?: Json
-          updated_at?: string
-        }
-      }
-      opportunities: {
-        Row: {
-          id: number
-          event_id: number | null
-          sport_key: string
-          bucket: string
-          market_key: string
-          line_value: string | null
-          period: string
-          include_ot: boolean
-          roi: number
-          legs_json: Json
+          id: string
+          code: string
+          plan_type: 'pro' | 'premium'
+          billing_cycle: 'monthly' | 'quarterly' | 'yearly'
+          is_used: boolean
+          created_by: string | null
+          used_by: string | null
+          redeemed_by_name: string | null
+          redeemed_by_email: string | null
           created_at: string
+          used_at: string | null
         }
         Insert: {
-          id?: number
-          event_id?: number | null
-          sport_key: string
-          bucket: string
-          market_key: string
-          line_value?: string | null
-          period?: string
-          include_ot?: boolean
-          roi: number
-          legs_json: Json
+          id?: string
+          code: string
+          plan_type: 'pro' | 'premium'
+          billing_cycle?: 'monthly' | 'quarterly' | 'yearly'
+          is_used?: boolean
+          created_by?: string | null
+          used_by?: string | null
+          redeemed_by_name?: string | null
+          redeemed_by_email?: string | null
           created_at?: string
+          used_at?: string | null
         }
         Update: {
-          id?: number
-          event_id?: number | null
-          sport_key?: string
-          bucket?: string
-          market_key?: string
-          line_value?: string | null
-          period?: string
-          include_ot?: boolean
-          roi?: number
-          legs_json?: Json
+          id?: string
+          code?: string
+          plan_type?: 'pro' | 'premium'
+          billing_cycle?: 'monthly' | 'quarterly' | 'yearly'
+          is_used?: boolean
+          created_by?: string | null
+          used_by?: string | null
+          redeemed_by_name?: string | null
+          redeemed_by_email?: string | null
           created_at?: string
+          used_at?: string | null
         }
       }
       user_settings: {
@@ -186,7 +59,12 @@ export interface Database {
           stake_percent_value: number
           roi_min: number
           is_premium: boolean
+          plan: 'basic' | 'pro' | 'premium'
           role: string
+          external_api_key?: string | null
+          api_enabled?: boolean
+          secondary_api_key?: string | null
+          secondary_api_enabled?: boolean
         }
         Insert: {
           user_id: string
@@ -196,6 +74,7 @@ export interface Database {
           stake_percent_value?: number
           roi_min?: number
           is_premium?: boolean
+          plan?: 'basic' | 'pro' | 'premium'
           role?: string
         }
         Update: {
@@ -206,8 +85,19 @@ export interface Database {
           stake_percent_value?: number
           roi_min?: number
           is_premium?: boolean
+          plan?: 'basic' | 'pro' | 'premium'
           role?: string
         }
+      }
+      opportunities: { Row: {} } // Placeholder
+      events: { Row: {} } // Placeholder
+      request_budget: { Row: {} } // Placeholder
+      event_queue: { Row: {} } // Placeholder
+    }
+    Functions: {
+      redeem_activation_code: {
+        Args: { code_input: string }
+        Returns: { success: boolean; message: string }
       }
     }
   }

@@ -19,22 +19,23 @@ export default function KpiCard({ title, value, icon: Icon, trend, trendUp = tru
   };
 
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-lg hover:border-slate-700 transition-all duration-300 group relative overflow-hidden">
+    <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 md:p-6 shadow-lg hover:border-slate-700 transition-all duration-300 group relative overflow-hidden flex flex-col justify-between h-full">
       {/* Background Glow Effect */}
       <div className={`absolute top-0 right-0 w-24 h-24 ${colors[color].split(' ')[0]} blur-3xl opacity-10 rounded-full -translate-y-1/2 translate-x-1/2`}></div>
 
       <div className="flex items-start justify-between mb-4 relative z-10">
-        <div>
-          <p className="text-slate-400 text-[11px] font-bold uppercase tracking-wider mb-1">{title}</p>
-          <h3 className="text-2xl font-bold text-white group-hover:scale-105 transition-transform origin-left">{value}</h3>
+        <div className="flex-1 pr-2">
+          <p className="text-slate-400 text-[10px] md:text-[11px] font-bold uppercase tracking-wider mb-1 leading-tight">{title}</p>
+          <h3 className="text-xl md:text-2xl font-bold text-white group-hover:scale-105 transition-transform origin-left">{value}</h3>
         </div>
-        <div className={`p-3 rounded-lg border ${colors[color]} transition-colors`}>
+        <div className={`p-2.5 md:p-3 rounded-lg border shrink-0 ${colors[color]} transition-colors`}>
           <Icon size={20} />
         </div>
       </div>
+      
       {trend && (
-        <div className="flex items-center gap-2 text-xs font-medium relative z-10">
-          <span className={`flex items-center gap-1 px-2 py-0.5 rounded-full border ${
+        <div className="flex items-center gap-2 text-xs font-medium relative z-10 mt-auto">
+          <span className={`flex items-center gap-1 px-2 py-0.5 rounded-full border whitespace-nowrap ${
             trendUp 
               ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' 
               : 'bg-rose-500/10 text-rose-400 border-rose-500/20'
@@ -42,7 +43,7 @@ export default function KpiCard({ title, value, icon: Icon, trend, trendUp = tru
             {trendUp ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
             {trend}
           </span>
-          <span className="text-slate-500">vs período anterior</span>
+          <span className="text-slate-500 text-[10px] md:text-xs">vs anterior</span>
         </div>
       )}
     </div>
