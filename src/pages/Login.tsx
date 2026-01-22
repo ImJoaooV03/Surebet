@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { useToast } from "../contexts/ToastContext";
 import { AuthLayout } from "../components/auth/AuthLayout";
-import { Mail, Lock, Eye, EyeOff, Loader2, ArrowRight, AlertCircle } from "lucide-react";
+import { Mail, Lock, Eye, EyeOff, Loader2, ArrowRight, AlertCircle, AlertTriangle } from "lucide-react";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -20,8 +20,8 @@ export default function Login() {
       setError("Por favor, insira um e-mail válido.");
       return false;
     }
-    if (!password || password.length < 6) {
-      setError("A senha deve ter pelo menos 6 caracteres.");
+    if (!password) {
+      setError("Por favor, insira sua senha.");
       return false;
     }
     return true;
@@ -34,6 +34,9 @@ export default function Login() {
     if (!validateForm()) return;
 
     setLoading(true);
+    
+    // Log de depuração (Remover em produção se desejar)
+    console.log("Tentando login com:", { email, passwordLength: password.length });
 
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
@@ -41,17 +44,33 @@ export default function Login() {
         password,
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error("Erro Supabase Auth:", error);
+        throw error;
+      }
 
       if (data.user) {
+        console.log("Login bem-sucedido:", data.user.id);
         toast("Login realizado com sucesso!", "success");
         navigate("/");
       }
     } catch (err: any) {
-      console.error("Login error:", err);
-      setError(err.message === "Invalid login credentials" 
-        ? "E-mail ou senha incorretos." 
-        : "Ocorreu um erro ao fazer login. Tente novamente.");
+      // Tratamento de erros detalhado
+      let friendlyMessage = "Ocorreu um erro ao fazer login.";
+      
+      const msg = err.message || "";
+      
+      if (msg.includes("Invalid login credentials")) {
+        friendlyMessage = "E-mail ou senha incorretos.";
+      } else if (msg.includes("Email not confirmed")) {
+        friendlyMessage = "Este e-mail ainda não foi confirmado.";
+      } else if (msg.includes("Too many requests")) {
+        friendlyMessage = "Muitas tentativas. Tente novamente mais tarde.";
+      } else if (msg.includes("Network request failed")) {
+        friendlyMessage = "Erro de conexão. Verifique sua internet.";
+      }
+
+      setError(friendlyMessage);
       toast("Falha na autenticação.", "error");
     } finally {
       setLoading(false);
@@ -65,9 +84,22 @@ export default function Login() {
     >
       <form onSubmit={handleLogin} className="space-y-5">
         {error && (
-          <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg flex items-start gap-3 text-sm text-red-400 animate-in fade-in slide-in-from-top-2">
-            <AlertCircle className="w-5 h-5 shrink-0" />
-            <span>{error}</span>
+          <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-lg flex items-start gap-3 text-sm text-red-400 animate-in fade-in slide-in-from-top-2">
+            <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <span className="font-bold block mb-1">Erro de Acesso</span>
+              <span>{error}</span>
+            </div>
+          </div>
+        )}
+
+        {/* Aviso para ambiente de desenvolvimento */}
+        {import.meta.env.DEV && (
+          <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg flex items-start gap-3 text-xs text-blue-300">
+            <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+            <div>
+              <strong>Nota de Desenvolvimento:</strong> Se você criou um usuário no painel Admin localmente, ele pode não existir no Supabase real. Certifique-se de usar um usuário real.
+            </div>
           </div>
         )}
 

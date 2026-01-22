@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { 
   Search, Plus, Edit, Trash2, 
   CheckCircle2, XCircle, Shield, User as UserIcon, 
-  Loader2, Mail, Calendar, Filter, AlertTriangle, X, Database 
+  Loader2, Mail, Calendar, Filter, AlertTriangle, X, Database, Info 
 } from "lucide-react";
 import { useToast } from "../../contexts/ToastContext";
 import { format } from "date-fns";
@@ -372,6 +372,12 @@ export function AdminUsers() {
                     className="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2.5 text-white focus:border-indigo-500 outline-none"
                     placeholder="Opcional (Padrão: Mudar123!)"
                   />
+                  {!formData.password && (
+                    <div className="flex items-center gap-2 text-xs text-amber-400 bg-amber-500/10 p-2 rounded border border-amber-500/20">
+                      <Info className="w-3 h-3" />
+                      Se vazio, a senha será: <strong>Mudar123!</strong>
+                    </div>
+                  )}
                 </div>
               )}
 
