@@ -1,118 +1,168 @@
-import { Activity, DollarSign, Target, AlertTriangle, Loader2, Globe, TestTube } from "lucide-react";
-import { formatCurrency } from "../lib/utils";
-import { SurebetCard } from "../components/surebet/SurebetCard";
-import { useSurebets } from "../hooks/useSurebets";
-import { useEffect, useState } from "react";
-import { supabase } from "../lib/supabase";
-import { useAuth } from "../contexts/AuthContext";
+import { useEffect, useState } from 'react';
+import { DollarSign, Activity, Target, TrendingUp, ArrowRight, Database, Server, Layers } from 'lucide-react';
+import KpiCard from '../components/dashboard/KpiCard';
+import { apiRequest } from '../lib/apiClient';
+import { Link } from 'react-router-dom';
 
-function StatCard({ title, value, subtext, icon: Icon, color }: any) {
-  return (
-    <div className="bg-slate-950 border border-slate-800 p-5 rounded-xl flex items-start justify-between">
-      <div>
-        <p className="text-slate-500 text-sm font-medium mb-1">{title}</p>
-        <h3 className="text-2xl font-bold text-slate-100">{value}</h3>
-        {subtext && <p className={`text-xs mt-1 ${color}`}>{subtext}</p>}
-      </div>
-      <div className={`p-3 rounded-lg bg-slate-900 border border-slate-800 ${color}`}>
-        <Icon className="w-5 h-5" />
-      </div>
-    </div>
-  );
-}
+export default function Dashboard() {
+  const [status, setStatus] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
 
-export function Dashboard() {
-  const { user } = useAuth();
-  const [apiMode, setApiMode] = useState<'real' | 'simulated'>('simulated');
-  
-  // Use the robust hook for Dashboard too
-  const { data: recentArbs, loading } = useSurebets({
-    limit: 4,
-    minRoi: 0,
-    autoRefresh: true
-  });
-
-  // Check API Mode
   useEffect(() => {
-    if (!user) return;
-    supabase.from('user_settings').select('external_api_key').eq('user_id', user.id).single()
-      .then(({ data }) => {
-        if (data?.external_api_key) setApiMode('real');
-      });
-  }, [user]);
+    apiRequest('/status')
+      .then(setStatus)
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, []);
 
-  // Calculate Stats on the fly based on validated data
-  const activeCount = recentArbs.length;
-  const avgRoiVal = activeCount > 0 
-    ? recentArbs.reduce((acc, curr) => acc + curr.roi, 0) / activeCount 
-    : 0;
-  const potProfit = recentArbs.reduce((acc, curr) => acc + (1000 * curr.roi), 0);
-
-  if (loading && recentArbs.length === 0) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 text-emerald-500 animate-spin" />
-      </div>
-    );
-  }
+  const totalBudget = 7500;
+  const footballUsed = status?.budget?.find((b: any) => b.sport_key === 'football')?.used || 0;
+  const basketballUsed = status?.budget?.find((b: any) => b.sport_key === 'basketball')?.used || 0;
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-100 mb-2">Visão Geral</h1>
-        <p className="text-slate-400">Monitoramento em tempo real de oportunidades validadas.</p>
-      </div>
-
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard 
-          title="Surebets Ativas" 
-          value={activeCount} 
-          subtext="Validadas e Ativas"
-          color="text-emerald-400"
-          icon={Activity}
-        />
-        <StatCard 
-          title="ROI Médio" 
-          value={(avgRoiVal * 100).toFixed(2) + "%"} 
-          subtext="Baseado no feed atual"
-          color="text-blue-400"
-          icon={Target}
-        />
-        <StatCard 
-          title="Lucro Potencial (Hoje)" 
-          value={formatCurrency(potProfit)} 
-          subtext="Baseado em stake de R$ 1.000"
-          color="text-emerald-400"
-          icon={DollarSign}
-        />
-        <StatCard 
-          title="Status da API" 
-          value={apiMode === 'real' ? "Modo Real" : "Simulação"} 
-          subtext={apiMode === 'real' ? "The-Odds-API Conectada" : "Dados Gerados (Mock)"}
-          color={apiMode === 'real' ? "text-purple-400" : "text-amber-400"}
-          icon={apiMode === 'real' ? Globe : TestTube}
-        />
-      </div>
-
-      {/* Recent Opportunities */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-slate-200">Oportunidades Recentes</h2>
-          <button className="text-sm text-emerald-400 hover:text-emerald-300 font-medium">Ver todas</button>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          {/* Título removido visualmente para bater com o print, ou mantido menor se preferir */}
+          <p className="text-slate-400 text-lg">Visão geral das operações de arbitragem em tempo real.</p>
         </div>
+      </div>
+
+      {/* KPI Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <KpiCard 
+          title="Lucro Estimado (Hoje)" 
+          value="R$ 145,50" 
+          icon={DollarSign} 
+          trend="+12%" 
+          color="emerald" 
+        />
+        <KpiCard 
+          title="Oportunidades Ativas" 
+          value={status?.totalOpportunities || 0} 
+          icon={Target} 
+          color="indigo" 
+        />
+        <KpiCard 
+          title="Eventos na Fila" 
+          value={Object.values(status?.queueStats || {}).reduce((a: any, b: any) => a + b, 0) as number} 
+          icon={Database} 
+          trend="Estável"
+          color="blue" 
+        />
+        <KpiCard 
+          title="ROI Médio" 
+          value="2.4%" 
+          icon={Activity} 
+          trend="+0.5%" 
+          color="amber" 
+        />
+      </div>
+
+      {/* Main Content Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-          {recentArbs.length > 0 ? (
-            recentArbs.map(arb => (
-              <SurebetCard key={arb.id} surebet={arb} bankroll={1000} />
-            ))
-          ) : (
-            <div className="col-span-full py-10 text-center bg-slate-950/50 rounded-xl border border-slate-800 border-dashed">
-              <p className="text-slate-500">Nenhuma oportunidade ativa no momento.</p>
-              <p className="text-xs text-slate-600 mt-1">O sistema está escaneando novos jogos...</p>
+        {/* Recent Opportunities Table */}
+        <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-lg">
+          <div className="p-6 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
+            <h3 className="text-lg font-bold text-white">Oportunidades Recentes</h3>
+            <Link to="/opportunities" className="text-xs font-bold text-indigo-400 hover:text-indigo-300 flex items-center gap-1 transition-colors">
+              Ver Todas <ArrowRight size={14} />
+            </Link>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm text-slate-400">
+              <thead className="bg-slate-950/30 text-slate-500 uppercase text-[11px] font-bold tracking-wider">
+                <tr>
+                  <th className="px-6 py-4">Evento</th>
+                  <th className="px-6 py-4">Casas</th>
+                  <th className="px-6 py-4">Lucro</th>
+                  <th className="px-6 py-4 text-right">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/50">
+                <tr className="hover:bg-slate-800/30 transition-colors group">
+                  <td className="px-6 py-4">
+                    <div className="font-bold text-slate-200 group-hover:text-white transition-colors">Lakers vs Warriors</div>
+                    <div className="text-xs text-slate-500">NBA • Totals</div>
+                  </td>
+                  <td className="px-6 py-4">Bet365 / Pinnacle</td>
+                  <td className="px-6 py-4 text-emerald-400 font-bold font-mono">2.5%</td>
+                  <td className="px-6 py-4 text-right">
+                    <span className="px-3 py-1 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded-full text-xs font-bold">Ao Vivo</span>
+                  </td>
+                </tr>
+                <tr className="hover:bg-slate-800/30 transition-colors group">
+                  <td className="px-6 py-4">
+                    <div className="font-bold text-slate-200 group-hover:text-white transition-colors">Flamengo vs Vasco</div>
+                    <div className="text-xs text-slate-500">Brasileirão • 1x2</div>
+                  </td>
+                  <td className="px-6 py-4">Betano / Sportingbet</td>
+                  <td className="px-6 py-4 text-emerald-400 font-bold font-mono">1.8%</td>
+                  <td className="px-6 py-4 text-right">
+                    <span className="px-3 py-1 bg-slate-800 text-slate-400 border border-slate-700 rounded-full text-xs font-bold">Pré-jogo</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* API Usage & Queue Stats */}
+        <div className="space-y-6">
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-lg">
+            <h3 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
+              <Server size={18} className="text-slate-500" /> Consumo da API
+            </h3>
+            <div className="space-y-6">
+              <div>
+                <div className="flex justify-between text-sm mb-2">
+                  <span className="text-slate-400 font-medium">Futebol</span>
+                  <span className="text-white font-mono text-xs">{footballUsed} / {totalBudget}</span>
+                </div>
+                <div className="w-full bg-slate-950 rounded-full h-2 border border-slate-800 overflow-hidden">
+                  <div 
+                    className="bg-indigo-500 h-full rounded-full transition-all duration-1000 shadow-[0_0_10px_rgba(99,102,241,0.5)]" 
+                    style={{ width: `${Math.min((footballUsed / totalBudget) * 100, 100)}%` }}
+                  ></div>
+                </div>
+              </div>
+              <div>
+                <div className="flex justify-between text-sm mb-2">
+                  <span className="text-slate-400 font-medium">Basquete</span>
+                  <span className="text-white font-mono text-xs">{basketballUsed} / {totalBudget}</span>
+                </div>
+                <div className="w-full bg-slate-950 rounded-full h-2 border border-slate-800 overflow-hidden">
+                  <div 
+                    className="bg-blue-500 h-full rounded-full transition-all duration-1000 shadow-[0_0_10px_rgba(59,130,246,0.5)]" 
+                    style={{ width: `${Math.min((basketballUsed / totalBudget) * 100, 100)}%` }}
+                  ></div>
+                </div>
+              </div>
             </div>
-          )}
+          </div>
+
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-lg">
+             <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+               <Layers size={18} className="text-slate-500" /> Fila de Processamento
+             </h3>
+             <div className="space-y-3">
+               {Object.entries(status?.queueStats || {}).map(([bucket, count]: any) => (
+                 <div key={bucket} className="flex items-center justify-between p-3 bg-slate-950 rounded-lg border border-slate-800">
+                   <div className="flex flex-col">
+                     <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">{bucket}</span>
+                     <span className="text-xs text-slate-400">Prioridade {bucket === 'LIVE' ? 'Alta' : 'Normal'}</span>
+                   </div>
+                   <div className="text-xl font-bold text-white font-mono">{count}</div>
+                 </div>
+               ))}
+               {!status?.queueStats && (
+                 <div className="text-center py-4">
+                   <div className="inline-block w-6 h-6 border-2 border-slate-700 border-t-emerald-500 rounded-full animate-spin"></div>
+                 </div>
+               )}
+             </div>
+          </div>
         </div>
       </div>
     </div>

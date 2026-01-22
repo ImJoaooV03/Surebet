@@ -23,43 +23,31 @@ export function formatPercent(value: number) {
 
 export const generateId = () => Math.random().toString(36).substring(2, 9);
 
-// Helper to transform Enterprise DB response to Frontend Surebet Type
-export function transformArbData(arb: any): Surebet {
-  // In Enterprise schema: arbs -> markets -> events
-  const market = arb.markets || {};
-  const event = market.events || {};
+// Transforma os dados da API (/api/opportunities) para o modelo da UI
+export function transformArbData(data: any): Surebet {
+  // O endpoint /api/opportunities retorna um join com events:
+  // { id, roi, legs_json, bucket, sport_key, market_key, events: { home_name, away_name, start_time_utc, league_id } }
   
-  // Handle potential missing joins safely
-  const homeTeam = event.teams_home?.name || 'Time Casa';
-  const awayTeam = event.teams_away?.name || 'Time Fora';
-  const league = event.leagues?.name || 'Liga Desconhecida';
-  const sport = event.sports?.name?.toLowerCase() || 'soccer';
-
-  // Map market type to readable string
-  let marketDisplay = market.market_type || 'Unknown';
-  if (market.market_type === 'soccer_1x2_90') marketDisplay = '1x2 (90min)';
-  else if (market.market_type === 'basket_ml') marketDisplay = 'Moneyline';
-  else if (market.market_type === 'soccer_ou') marketDisplay = `O/U ${market.line_value}`;
+  const evt = data.events || {};
 
   return {
-    id: arb.id,
-    sport: sport as any,
-    league: league,
-    homeTeam: homeTeam,
-    awayTeam: awayTeam,
-    market: marketDisplay,
-    startTime: new Date(event.start_time || Date.now()),
-    isLive: event.status === 'live',
-    roi: Number(arb.roi),
-    totalImpliedProb: Number(arb.sum_inv),
-    createdAt: new Date(arb.created_at),
-    expiresAt: new Date(arb.expires_at),
-    legs: (arb.arb_legs || []).map((leg: any) => ({
-      outcome: leg.outcome_key,
-      odd: Number(leg.odd_value),
-      bookmaker: leg.books?.name || 'Book',
-      impliedProb: 1 / Number(leg.odd_value),
-      suggestedStake: 0 // Calculated on frontend
-    }))
+    id: data.id.toString(),
+    sport: data.sport_key,
+    league: evt.league_id || 'Liga', // API-Sports as vezes manda ID, ideal seria nome
+    homeTeam: evt.home_name || 'Casa',
+    awayTeam: evt.away_name || 'Fora',
+    market: data.market_key,
+    startTime: new Date(evt.start_time_utc || Date.now()),
+    isLive: data.bucket === 'LIVE',
+    bucket: data.bucket,
+    roi: Number(data.roi),
+    legs: (data.legs_json || []).map((leg: any) => ({
+      bookmaker: leg.bookmaker,
+      outcome: leg.outcome,
+      odd: Number(leg.odd),
+      stake_percent: Number(leg.stake_percent),
+      suggestedStake: 0
+    })),
+    createdAt: new Date(data.created_at)
   };
 }

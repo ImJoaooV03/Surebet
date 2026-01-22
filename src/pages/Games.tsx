@@ -1,33 +1,16 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { eventService } from "../services/eventService";
 import { format, addDays, subDays, isSameDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Clock, Loader2, Trophy, RefreshCw, AlertCircle } from "lucide-react";
 import { Badge } from "../components/ui/Badge";
-import { supabase } from "../lib/supabase";
-import { useAuth } from "../contexts/AuthContext";
-import { theOddsApiService } from "../services/theOddsApiService";
 import { useToast } from "../contexts/ToastContext";
 
 export function Games() {
   const [selectedDate, setSelectedDate] = useState(new Date());
-  const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [apiKey, setApiKey] = useState<string | null>(null);
-  
-  // Estado robusto para o processo de sincronização
-  const [syncing, setSyncing] = useState(false);
-
-  // Buscar chave de API para habilitar o botão de sync
-  useEffect(() => {
-    if (!user) return;
-    supabase.from('user_settings').select('external_api_key').eq('user_id', user.id).single()
-      .then(({ data }) => {
-        if (data?.external_api_key) setApiKey(data.external_api_key);
-      });
-  }, [user]);
 
   const { data: games = [], isLoading, isError } = useQuery({
     queryKey: ['games', format(selectedDate, 'yyyy-MM-dd')],
@@ -39,59 +22,10 @@ export function Games() {
   const handleNextDay = () => setSelectedDate(prev => addDays(prev, 1));
   const handleToday = () => setSelectedDate(new Date());
 
-  /**
-   * Lógica Robusta de Sincronização
-   * Inclui Timeout, Try/Catch/Finally e Feedback Visual
-   */
-  const handleSync = async () => {
-    // 1. Validação Prévia
-    if (!apiKey) {
-      toast("Configure sua chave de API nas configurações primeiro.", "error");
-      return;
-    }
-
-    if (syncing) return; // Previne cliques duplos
-
-    setSyncing(true);
-    toast("Iniciando sincronização com casas de aposta...", "info");
-    
-    try {
-      // 2. Timeout de Segurança AUMENTADO (60 segundos)
-      // Aumentado para dar tempo de processar múltiplas ligas
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error("A sincronização está demorando mais que o esperado. O processo continuará em segundo plano.")), 60000)
-      );
-
-      // 3. Execução da API (Race entre a chamada e o timeout)
-      const result = await Promise.race([
-        theOddsApiService.fetchAndProcessOdds(apiKey),
-        timeoutPromise
-      ]) as { success: boolean; events?: number; arbs?: number; error?: string };
-
-      // 4. Tratamento do Resultado
-      if (result.success) {
-        toast(`Sincronização concluída! ${result.events} jogos atualizados e ${result.arbs} surebets analisadas.`, "success");
-        
-        // Força atualização imediata da lista de jogos e do cache
-        await queryClient.invalidateQueries({ queryKey: ['games'] });
-        await queryClient.invalidateQueries({ queryKey: ['surebets'] });
-      } else {
-        throw new Error(result.error || "Falha desconhecida na comunicação com a API.");
-      }
-
-    } catch (err: any) {
-      console.error("Erro no Sync:", err);
-      
-      // Tratamento diferenciado para timeout vs erro real
-      if (err.message.includes("segundo plano")) {
-        toast(err.message, "info");
-      } else {
-        toast(`Erro ao sincronizar: ${err.message}`, "error");
-      }
-    } finally {
-      // 5. Garantia de Desbloqueio da UI
-      setSyncing(false);
-    }
+  const handleRefresh = async () => {
+    toast("Atualizando lista de jogos...", "info");
+    await queryClient.invalidateQueries({ queryKey: ['games'] });
+    toast("Lista atualizada!", "success");
   };
 
   const isToday = isSameDay(selectedDate, new Date());
@@ -111,24 +45,15 @@ export function Games() {
         </div>
 
         <div className="flex items-center gap-4">
-          {/* Botão de Sincronizar Robusto */}
-          {apiKey && (
-            <button
-              onClick={handleSync}
-              disabled={syncing}
-              className={`
-                flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all border
-                ${syncing 
-                  ? "bg-slate-800 text-slate-400 border-slate-700 cursor-not-allowed opacity-80" 
-                  : "bg-blue-600/10 text-blue-400 hover:bg-blue-600/20 border-blue-600/20 hover:border-blue-500/30"
-                }
-              `}
-              title="Buscar jogos mais recentes na API"
-            >
-              <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
-              {syncing ? "Sincronizando..." : "Atualizar Grade"}
-            </button>
-          )}
+          {/* Botão de Atualizar */}
+          <button
+            onClick={handleRefresh}
+            className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all border bg-blue-600/10 text-blue-400 hover:bg-blue-600/20 border-blue-600/20 hover:border-blue-500/30"
+            title="Recarregar lista de jogos"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Atualizar Grade
+          </button>
 
           <div className="flex items-center bg-slate-950 border border-slate-800 rounded-lg p-1">
             <button 
@@ -184,21 +109,18 @@ export function Games() {
             <Trophy className="w-12 h-12 text-slate-700 mx-auto mb-3" />
             <p className="text-slate-400 font-medium">Nenhum jogo encontrado para esta data.</p>
             <p className="text-xs text-slate-600 mt-1 mb-4">
-              Verifique se a API está ativa ou tente sincronizar.
+              Verifique se a API está ativa ou tente atualizar.
             </p>
-            {apiKey && (
-              <button 
-                onClick={handleSync}
-                disabled={syncing}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm text-slate-200 transition-colors border border-slate-700"
-              >
-                <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
-                {syncing ? "Sincronizando..." : "Tentar Sincronizar Agora"}
-              </button>
-            )}
+            <button 
+              onClick={handleRefresh}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm text-slate-200 transition-colors border border-slate-700"
+            >
+              <RefreshCw className="w-4 h-4" />
+              Tentar Novamente
+            </button>
           </div>
         ) : (
-          games.map((game) => (
+          games.map((game: any) => (
             <div 
               key={game.id} 
               className="bg-slate-950 border border-slate-800 rounded-lg p-4 flex flex-col md:flex-row items-center gap-4 hover:border-slate-700 transition-colors group"
@@ -219,12 +141,12 @@ export function Games() {
               {/* Times e Liga */}
               <div className="flex-1 text-center md:text-left w-full">
                 <div className="text-xs text-emerald-500 font-bold uppercase tracking-wider mb-1 flex items-center justify-center md:justify-start gap-2">
-                  {game.sport} • {game.league}
+                  {game.sport_key} • {game.league_id || 'Liga'}
                 </div>
                 <div className="flex items-center justify-center md:justify-start gap-3 text-lg font-medium text-slate-200">
-                  <span className="flex-1 text-right md:flex-none">{game.home_team}</span>
+                  <span className="flex-1 text-right md:flex-none">{game.home_name}</span>
                   <span className="text-slate-600 font-bold text-sm">VS</span>
-                  <span className="flex-1 text-left md:flex-none">{game.away_team}</span>
+                  <span className="flex-1 text-left md:flex-none">{game.away_name}</span>
                 </div>
               </div>
 

@@ -2,10 +2,13 @@ import { useState, useEffect } from "react";
 import { Surebet } from "../../types";
 import { formatCurrency, formatPercent } from "../../lib/utils";
 import { calculateArb } from "../../lib/calculator";
-import { Calculator, ExternalLink, Clock, Copy, CheckCircle2, Calendar, TrendingUp } from "lucide-react";
+import { Calculator, Clock, Copy, CheckCircle2, Calendar, TrendingUp, Lock, Crown, Flame } from "lucide-react";
 import { Badge } from "../ui/Badge";
-import { formatDistanceToNow, format } from "date-fns";
+import { format, differenceInMinutes } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { useAuth } from "../../contexts/AuthContext";
+import { supabase } from "../../lib/supabase";
+import { useNavigate } from "react-router-dom";
 
 interface SurebetCardProps {
   surebet: Surebet;
@@ -13,14 +16,39 @@ interface SurebetCardProps {
 }
 
 export function SurebetCard({ surebet, bankroll }: SurebetCardProps) {
-  // Estado local para a calculadora integrada
-  const [investment, setInvestment] = useState(bankroll * 0.1); // Default 10% stake
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const [investment, setInvestment] = useState(bankroll * 0.1);
   const [copied, setCopied] = useState(false);
+  const [isPremium, setIsPremium] = useState(false);
+  const [loadingPremium, setLoadingPremium] = useState(true);
 
-  // Recalcula sempre que o investimento mudar
+  // Check Premium Status
+  useEffect(() => {
+    if (!user) return;
+    
+    const checkPremium = async () => {
+      const { data } = await supabase.from('user_settings').select('is_premium').eq('user_id', user.id).single();
+      setIsPremium(data?.is_premium || false);
+      setLoadingPremium(false);
+    };
+    
+    checkPremium();
+
+    // Listen for realtime updates to premium status
+    const channel = supabase
+      .channel(`card_settings_${surebet.id}`)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'user_settings', filter: `user_id=eq.${user.id}` }, 
+      (payload) => {
+        setIsPremium(payload.new.is_premium || false);
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [user, surebet.id]);
+
   const calculation = calculateArb(surebet.legs, investment);
 
-  // Efeito para atualizar o investimento padrão se a banca mudar nas props
   useEffect(() => {
     setInvestment(bankroll * 0.1);
   }, [bankroll]);
@@ -34,11 +62,37 @@ export function SurebetCard({ surebet, bankroll }: SurebetCardProps) {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  // Freemium Logic: Lock if ROI > 1.5% and User is NOT Premium
+  const isLocked = !loadingPremium && !isPremium && surebet.roi > 0.015;
+  
+  // Urgency Logic: Created less than 5 minutes ago
+  const isNew = differenceInMinutes(new Date(), new Date(surebet.createdAt)) < 5;
+
   return (
-    <div className="bg-slate-950 border border-slate-800 rounded-xl overflow-hidden hover:border-emerald-500/30 transition-all duration-300 shadow-lg shadow-black/20 group flex flex-col h-full">
+    <div className="bg-slate-950 border border-slate-800 rounded-xl overflow-hidden hover:border-emerald-500/30 transition-all duration-300 shadow-lg shadow-black/20 group flex flex-col h-full relative">
+      
+      {/* Freemium Overlay */}
+      {isLocked && (
+        <div className="absolute inset-0 z-20 backdrop-blur-[6px] bg-slate-950/40 flex flex-col items-center justify-center text-center p-6 animate-in fade-in duration-500">
+          <div className="w-16 h-16 bg-gradient-to-br from-amber-400 to-orange-600 rounded-full flex items-center justify-center shadow-lg shadow-orange-500/20 mb-4 animate-bounce">
+            <Lock className="w-8 h-8 text-white" />
+          </div>
+          <h3 className="text-xl font-bold text-white mb-2">Oportunidade Premium</h3>
+          <p className="text-slate-300 text-sm mb-6 max-w-[250px]">
+            Surebets com lucro acima de 1.5% são exclusivas para assinantes.
+          </p>
+          <button 
+            onClick={() => navigate('/settings')}
+            className="px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-white font-bold rounded-lg shadow-lg shadow-orange-900/50 transition-all transform hover:scale-105 flex items-center gap-2"
+          >
+            <Crown className="w-4 h-4" />
+            Desbloquear Agora
+          </button>
+        </div>
+      )}
+
       {/* Header */}
       <div className="p-5 border-b border-slate-800 bg-gradient-to-r from-slate-900/80 to-slate-900/40 flex items-start justify-between relative overflow-hidden">
-        {/* Background Accent */}
         <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none"></div>
 
         <div className="flex items-start gap-4 relative z-10">
@@ -48,7 +102,12 @@ export function SurebetCard({ surebet, bankroll }: SurebetCardProps) {
           </div>
           
           <div>
-            <div className="flex items-center gap-2 mb-1.5">
+            <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+              {isNew && !isLocked && (
+                <Badge variant="warning" className="flex items-center gap-1 animate-pulse shadow-amber-500/20 shadow-sm">
+                  <Flame className="w-3 h-3" /> NOVO
+                </Badge>
+              )}
               <Badge variant={surebet.isLive ? "danger" : "success"} className="shadow-sm">
                 {surebet.isLive ? "AO VIVO" : "PRÉ-JOGO"}
               </Badge>
@@ -65,7 +124,7 @@ export function SurebetCard({ surebet, bankroll }: SurebetCardProps) {
                <div className="flex items-center gap-1.5">
                  <Calendar className="w-3.5 h-3.5 text-emerald-500" />
                  <span className="font-medium text-slate-300">
-                   {format(surebet.startTime, "dd/MM • HH:mm", { locale: ptBR })}
+                   {format(new Date(surebet.startTime), "dd/MM • HH:mm", { locale: ptBR })}
                  </span>
                </div>
                <div className="flex items-center gap-1.5 border-l border-slate-700 pl-3">
@@ -85,7 +144,7 @@ export function SurebetCard({ surebet, bankroll }: SurebetCardProps) {
         </div>
       </div>
 
-      {/* Legs Table (Calculadora Visual) */}
+      {/* Legs Table */}
       <div className="p-4 grid gap-3 flex-1 bg-slate-900/20">
         {calculation.legs.map((leg, idx) => (
           <div key={idx} className="flex items-center justify-between bg-slate-900 p-3 rounded-lg border border-slate-800 hover:border-slate-700 transition-colors group/leg">
@@ -104,14 +163,14 @@ export function SurebetCard({ surebet, bankroll }: SurebetCardProps) {
             </div>
             
             <div className="text-center w-[20%]">
-              <span className="text-slate-300 font-bold font-mono text-lg group-hover/leg:text-white transition-colors">
+              <span className={`text-slate-300 font-bold font-mono text-lg transition-colors ${isLocked ? 'blur-sm select-none' : ''}`}>
                 {leg.odd.toFixed(2)}
               </span>
             </div>
 
             <div className="w-[35%] flex justify-end">
               <div className="flex flex-col items-end">
-                <span className="text-sm font-mono text-emerald-400 font-bold bg-emerald-500/5 px-2 py-0.5 rounded border border-emerald-500/10">
+                <span className={`text-sm font-mono text-emerald-400 font-bold bg-emerald-500/5 px-2 py-0.5 rounded border border-emerald-500/10 ${isLocked ? 'blur-sm select-none' : ''}`}>
                   {formatCurrency(leg.suggestedStake)}
                 </span>
                 <span className="text-[10px] text-slate-600 mt-0.5">Apostar</span>
@@ -137,7 +196,8 @@ export function SurebetCard({ surebet, bankroll }: SurebetCardProps) {
                   type="number" 
                   value={investment}
                   onChange={(e) => setInvestment(Number(e.target.value))}
-                  className="w-full bg-transparent border-none p-0 pl-5 text-sm font-bold text-slate-200 focus:ring-0 placeholder:text-slate-700"
+                  disabled={isLocked}
+                  className="w-full bg-transparent border-none p-0 pl-5 text-sm font-bold text-slate-200 focus:ring-0 placeholder:text-slate-700 disabled:opacity-50"
                   placeholder="0.00"
                 />
               </div>
@@ -146,7 +206,8 @@ export function SurebetCard({ surebet, bankroll }: SurebetCardProps) {
 
           <button 
             onClick={handleCopy}
-            className="flex items-center gap-2 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 hover:text-white text-slate-300 rounded-lg text-xs font-bold transition-all border border-slate-700 active:scale-95"
+            disabled={isLocked}
+            className="flex items-center gap-2 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 hover:text-white text-slate-300 rounded-lg text-xs font-bold transition-all border border-slate-700 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {copied ? <CheckCircle2 className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
             {copied ? "Copiado!" : "Copiar"}
