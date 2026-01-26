@@ -48,9 +48,6 @@ const saveLocalUsers = (users: any[]) => {
 // Mock data para outras rotas (Fallback apenas)
 const getMockData = (endpoint: string, options?: RequestInit) => {
   
-  // --- REMOVIDO: Mock de Teste da Odds Blaze ---
-  // Agora o sistema tentará a conexão real e retornará erro se falhar.
-
   // --- MOCK INTELIGENTE PARA USUÁRIOS (PERSISTENTE) ---
   if (endpoint.includes('/admin/users')) {
     const users = getLocalUsers();
@@ -123,9 +120,13 @@ export async function apiRequest<T>(endpoint: string, options?: RequestInit): Pr
       // Se não for JSON, provavelmente é um erro 404/500 do servidor web retornando HTML
       console.warn(`[API] Resposta não-JSON de ${endpoint}. Status: ${res.status}`);
       
-      // Se for o teste da OddsBlaze, lançamos erro para a UI mostrar
+      // Se for o teste da OddsBlaze, lançamos erro detalhado para a UI mostrar
       if (endpoint.includes('test-oddsblaze')) {
-        throw new Error(`O backend não está respondendo (Status ${res.status}). Verifique se as Serverless Functions foram deployadas corretamente.`);
+        let errorMsg = `O backend não respondeu (Status ${res.status}).`;
+        if (res.status === 404) errorMsg = "Erro 404: A função da API não foi encontrada. Verifique se o arquivo 'api/admin/test-oddsblaze.ts' foi deployado.";
+        if (res.status === 500) errorMsg = "Erro 500: O servidor encontrou um erro interno. Verifique os logs do Vercel.";
+        
+        throw new Error(errorMsg);
       }
 
       return getMockData(endpoint, options) as unknown as T;
