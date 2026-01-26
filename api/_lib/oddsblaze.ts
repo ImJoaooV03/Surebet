@@ -27,107 +27,99 @@ interface OddsBlazeOutcome {
   price: number;
 }
 
-// URL Base da Odds Blaze
-const BASE_URL_V1 = 'https://api.oddsblaze.com/v1'; 
-const BASE_URL_API_V1 = 'https://api.oddsblaze.com/api/v1';
+// Lista de URLs Base para tentar (Redundância)
+const BASE_URLS = [
+  'https://api.oddsblaze.com/v1',
+  'https://api.oddsblaze.com/api/v1',
+  'https://data.oddsblaze.com/v1'
+];
 
 /**
- * Testa a conexão com a API buscando Odds de Futebol (Endpoint principal)
- * Mudamos de /sports para /odds pois /sports estava retornando 404 (R2 Error).
+ * Testa a conexão com a API tentando múltiplos endpoints e URLs base.
+ * Garante que encontremos a rota correta mesmo se a documentação estiver desatualizada.
  */
 export async function testOddsBlazeConnection(apiKey: string) {
-  try {
-    console.log("[OddsBlaze] Testando conexão via /odds (soccer)...");
-    
-    // Tenta URL padrão buscando odds de futebol (limite pequeno para ser rápido)
-    // Nota: Algumas APIs exigem parâmetros. Vamos tentar o mais comum.
-    let url = `${BASE_URL_V1}/odds?sport=soccer&regions=br&markets=h2h`;
-    
-    let response = await fetch(url, {
-      headers: { 'Authorization': `Bearer ${apiKey}`, 'Accept': 'application/json' }
-    });
+  let lastError = "";
 
-    // Se der 404, tenta a rota alternativa (/api/v1)
-    if (response.status === 404) {
-      console.log("[OddsBlaze] 404 na rota padrão, tentando /api/v1...");
-      url = `${BASE_URL_API_V1}/odds?sport=soccer&regions=br&markets=h2h`;
-      response = await fetch(url, {
-        headers: { 'Authorization': `Bearer ${apiKey}`, 'Accept': 'application/json' }
-      });
+  // Estratégia: Tentar URLs base diferentes
+  for (const baseUrl of BASE_URLS) {
+    // Estratégia: Tentar endpoints diferentes (do mais específico para o mais genérico)
+    const endpoints = [
+      '/odds?sport=soccer&limit=1', // Tenta pegar 1 odd (teste real)
+      '/sports',                    // Tenta listar esportes (leve)
+      '/status'                     // Tenta status do servidor
+    ];
+
+    for (const endpoint of endpoints) {
+      const url = `${baseUrl}${endpoint}`;
+      console.log(`[OddsBlaze] Testando conexão em: ${url}`);
+
+      try {
+        const response = await fetch(url, {
+          headers: { 
+            'Authorization': `Bearer ${apiKey}`, 
+            'Accept': 'application/json' 
+          }
+        });
+
+        const contentType = response.headers.get("content-type");
+        const isJson = contentType && contentType.includes("application/json");
+
+        // SUCESSO: 200 OK e JSON válido
+        if (response.ok && isJson) {
+          const data = await response.json();
+          return { 
+            success: true, 
+            message: `Conexão estabelecida com sucesso via ${baseUrl}!`,
+            count: Array.isArray(data) ? data.length : 1
+          };
+        }
+
+        // ERRO DE CHAVE: 401/403 (A conexão funcionou, mas a chave foi recusada)
+        if (response.status === 401 || response.status === 403) {
+          return { success: false, error: "Chave de API recusada (Erro 401/403). Verifique se sua assinatura está ativa." };
+        }
+
+        // ERRO 404 HTML (Rota errada): Apenas loga e tenta a próxima
+        if (!response.ok) {
+          lastError = `Erro ${response.status} ao tentar conectar.`;
+        }
+
+      } catch (e: any) {
+        console.error(`[OddsBlaze] Falha ao conectar em ${url}:`, e.message);
+        lastError = e.message;
+      }
     }
-
-    // Se ainda der erro, verifica se é HTML (Erro do Cloudflare/R2)
-    const contentType = response.headers.get("content-type");
-    if (contentType && !contentType.includes("application/json")) {
-      throw new Error(`A API da Odds Blaze retornou uma página HTML (Erro ${response.status}). O serviço pode estar instável ou a URL mudou.`);
-    }
-
-    if (!response.ok) {
-      const errorJson = await response.json().catch(() => ({}));
-      throw new Error(`Erro ${response.status}: ${errorJson.message || 'Falha na autenticação ou limites.'}`);
-    }
-
-    const data = await response.json();
-    
-    // Validação básica se retornou array
-    if (!Array.isArray(data)) {
-      // Se não for array, pode ser sucesso mas sem dados, ou estrutura diferente.
-      // Mas se chegou aqui com 200 OK, a chave é válida.
-      return { success: true, message: "Conexão estabelecida! (Nenhum evento encontrado no momento, mas a chave funciona)." };
-    }
-
-    return { 
-      success: true, 
-      count: data.length, 
-      message: `Conexão Perfeita! ${data.length} eventos encontrados.` 
-    };
-
-  } catch (error: any) {
-    console.error("Erro no teste OddsBlaze:", error);
-    return { success: false, error: error.message };
   }
+
+  return { success: false, error: lastError || "Não foi possível conectar a nenhum servidor da Odds Blaze. O serviço pode estar offline." };
 }
 
 /**
- * Busca dados da Odds Blaze
+ * Busca dados da Odds Blaze usando a estratégia de multi-tentativa
  */
-export async function fetchOddsBlazeData(apiKey: string, sport: string = 'soccer', throwOnError: boolean = false) {
-  try {
-    console.log(`[OddsBlaze] Fetching ${sport}...`);
+export async function fetchOddsBlazeData(apiKey: string, sport: string = 'soccer') {
+  // Tenta encontrar uma URL que funcione
+  for (const baseUrl of BASE_URLS) {
+    const url = `${baseUrl}/odds?sport=${sport}&regions=br,eu&markets=h2h,totals`;
     
-    // Tenta URL padrão
-    let url = `${BASE_URL_V1}/odds?sport=${sport}&regions=br,eu`;
-    let response = await fetch(url, {
-      headers: { 'Authorization': `Bearer ${apiKey}`, 'Accept': 'application/json' }
-    });
-
-    // Fallback de URL se necessário
-    if (response.status === 404) {
-      url = `${BASE_URL_API_V1}/odds?sport=${sport}&regions=br,eu`;
-      response = await fetch(url, {
+    try {
+      console.log(`[OddsBlaze] Fetching data from: ${url}`);
+      const response = await fetch(url, {
         headers: { 'Authorization': `Bearer ${apiKey}`, 'Accept': 'application/json' }
       });
-    }
 
-    if (!response.ok) {
-      if (throwOnError) {
-        throw new Error(`Falha na API Odds Blaze: ${response.status}`);
+      if (response.ok) {
+        const data = await response.json();
+        if (Array.isArray(data)) return data as OddsBlazeEvent[];
       }
-      return [];
+    } catch (e) {
+      console.warn(`[OddsBlaze] Failed to fetch from ${baseUrl}`);
     }
-
-    const data = await response.json();
-    
-    if (!Array.isArray(data)) {
-      return [];
-    }
-
-    return data as OddsBlazeEvent[];
-  } catch (error: any) {
-    console.error("Erro na integração Odds Blaze:", error.message);
-    if (throwOnError) throw error;
-    return [];
   }
+
+  console.error("[OddsBlaze] Todas as tentativas de busca falharam.");
+  return [];
 }
 
 /**
