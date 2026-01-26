@@ -114,14 +114,17 @@ export function AdminIntegrations() {
       });
 
       if (res.success) {
-        toast(res.message, "success");
+        // Se for mensagem de simulação, mostra info em vez de success
+        if (res.message.includes("Ambiente Local") || res.message.includes("Aviso")) {
+          toast(res.message, "info");
+        } else {
+          toast(res.message, "success");
+        }
       } else {
-        // Mostra o erro real retornado pelo backend
         toast(`Falha: ${res.error || "Erro desconhecido"}`, "error");
       }
     } catch (err: any) {
       console.error("Erro no teste:", err);
-      // Mostra a mensagem de exceção real (ex: 404, 500)
       toast(err.message || "Erro crítico de conexão.", "error");
     } finally {
       setTesting(false);
@@ -136,7 +139,7 @@ export function AdminIntegrations() {
       {/* Status do Backend */}
       <div className={`flex items-center gap-3 p-4 rounded-lg border ${
         pingStatus === 'online' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : 
-        pingStatus === 'offline' ? 'bg-red-500/10 border-red-500/20 text-red-400' : 
+        pingStatus === 'offline' ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 
         'bg-slate-900 border-slate-800 text-slate-400'
       }`}>
         <Activity size={20} className={pingStatus === 'checking' ? 'animate-pulse' : ''} />
@@ -144,19 +147,19 @@ export function AdminIntegrations() {
           <p className="text-sm font-bold">
             Status do Servidor: {
               pingStatus === 'online' ? 'ONLINE (Pronto para conectar)' : 
-              pingStatus === 'offline' ? 'OFFLINE (Verifique o Deploy)' : 
+              pingStatus === 'offline' ? 'OFFLINE / LOCAL (Modo Simulação Ativo)' : 
               'Verificando...'
             }
           </p>
           {pingStatus === 'offline' && (
             <p className="text-xs mt-1 opacity-80">
-              As funções de backend não estão respondendo. Certifique-se de que o deploy na Vercel foi concluído com sucesso.
+              Você está rodando localmente ou o backend não respondeu. As configurações serão salvas, mas o teste real ocorrerá apenas quando o robô rodar no servidor.
             </p>
           )}
         </div>
         {pingStatus === 'offline' && (
-          <button onClick={checkBackendHealth} className="px-3 py-1.5 bg-red-500/20 hover:bg-red-500/30 rounded text-xs font-bold transition-colors">
-            Tentar Novamente
+          <button onClick={checkBackendHealth} className="px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 rounded text-xs font-bold transition-colors">
+            Verificar Novamente
           </button>
         )}
       </div>
