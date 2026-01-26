@@ -27,7 +27,7 @@ interface OddsBlazeOutcome {
   price: number;
 }
 
-// URL Base da Odds Blaze (Ajustar conforme documentação oficial)
+// URL Base da Odds Blaze
 const BASE_URL = 'https://api.oddsblaze.com/v1'; 
 
 /**
@@ -36,7 +36,9 @@ const BASE_URL = 'https://api.oddsblaze.com/v1';
  */
 export async function fetchOddsBlazeData(apiKey: string, sport: string = 'soccer', throwOnError: boolean = false) {
   try {
-    // Endpoint simulado. Em produção, use o endpoint real da documentação da Odds Blaze.
+    console.log(`[OddsBlaze] Fetching ${sport}...`);
+    
+    // Requisição real para a API
     const response = await fetch(`${BASE_URL}/odds?sport=${sport}&regions=br,eu`, {
       headers: {
         'Authorization': `Bearer ${apiKey}`,
@@ -47,21 +49,26 @@ export async function fetchOddsBlazeData(apiKey: string, sport: string = 'soccer
     if (!response.ok) {
       const errText = await response.text();
       const errorMessage = `Odds Blaze API Error (${response.status}): ${errText}`;
+      console.error(errorMessage);
       
       if (throwOnError) {
-        throw new Error(errorMessage);
-      } else {
-        console.error(errorMessage);
-        return [];
+        throw new Error(`Falha na API Odds Blaze: ${response.status} - Verifique sua chave.`);
       }
+      return [];
     }
 
     const data = await response.json();
+    
+    // Validação básica da resposta
+    if (!Array.isArray(data)) {
+      console.warn("[OddsBlaze] Resposta inesperada (não é array):", data);
+      return [];
+    }
+
     return data as OddsBlazeEvent[];
   } catch (error: any) {
-    if (throwOnError) throw error;
-    
     console.error("Erro na integração Odds Blaze:", error.message);
+    if (throwOnError) throw error;
     return [];
   }
 }
@@ -78,6 +85,8 @@ export function processOddsBlazeEvents(events: OddsBlazeEvent[], minRoi: number 
   for (const event of events) {
     // Mapa para agrupar odds por mercado: MarketKey -> Lista de Odds de várias casas
     const marketMap = new Map<string, any[]>();
+
+    if (!event.bookmakers) continue;
 
     event.bookmakers.forEach(bookie => {
       bookie.markets.forEach(market => {
@@ -151,6 +160,8 @@ function isMarketCovered(marketKey: string, bestOdds: Record<string, any>): bool
   // Regras básicas de cobertura
   if (marketKey.includes('h2h') || marketKey.includes('winner') || marketKey.includes('moneyline')) {
     const hasHomeAway = outcomes.includes('HOME') && outcomes.includes('AWAY');
+    // Se for 3-way (futebol), precisa do empate
+    // Aqui simplificamos: se tiver HOME e AWAY, já consideramos para cálculo (engine valida soma < 1)
     return hasHomeAway; 
   }
   

@@ -95,7 +95,7 @@ export function AdminIntegrations() {
     
     setTesting(true);
     try {
-      // Chama o endpoint de teste criado
+      // Chama o endpoint de teste
       const res: any = await apiRequest('/admin/test-oddsblaze', {
         method: 'POST',
         body: JSON.stringify({ apiKey: oddsBlazeKey })
@@ -104,10 +104,11 @@ export function AdminIntegrations() {
       if (res.success) {
         toast(res.message, "success");
       } else {
-        toast("Falha no teste: " + res.error, "error");
+        toast("Falha: " + (res.error || "Erro desconhecido"), "error");
       }
     } catch (err: any) {
-      toast("Erro ao testar conexão.", "error");
+      console.error("Erro no teste:", err);
+      toast("Erro de Conexão: O backend não respondeu. Verifique o deploy.", "error");
     } finally {
       setTesting(false);
     }
