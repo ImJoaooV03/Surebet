@@ -124,7 +124,7 @@ export async function apiRequest<T>(endpoint: string, options?: RequestInit): Pr
       console.warn(`[API] Corpo: ${textBody.substring(0, 200)}...`);
       
       // Se for o teste da OddsBlaze, lançamos erro detalhado para a UI mostrar
-      if (endpoint.includes('test-oddsblaze')) {
+      if (endpoint.includes('test-oddsblaze') || endpoint.includes('ping')) {
         let errorMsg = `Erro ${res.status}: O backend retornou HTML/Texto.`;
         
         if (res.status === 404) errorMsg = "Erro 404: Rota da API não encontrada. Verifique o vercel.json.";
@@ -138,8 +138,11 @@ export async function apiRequest<T>(endpoint: string, options?: RequestInit): Pr
     }
 
     if (!res.ok) {
-      const error = await res.json().catch(() => ({ message: 'Unknown error' }));
-      throw new Error(error.message || `API Error: ${res.status}`);
+      // Tenta extrair a mensagem de erro do JSON
+      const errorBody = await res.json().catch(() => ({}));
+      // O backend pode enviar 'message' ou 'error'
+      const errorMessage = errorBody.message || errorBody.error || `API Error: ${res.status}`;
+      throw new Error(errorMessage);
     }
 
     return res.json();
@@ -147,7 +150,7 @@ export async function apiRequest<T>(endpoint: string, options?: RequestInit): Pr
     console.error(`API Request Error (${endpoint}):`, error);
     
     // Propaga o erro se for o teste de conexão, para o usuário ver o feedback real
-    if (endpoint.includes('test-oddsblaze')) {
+    if (endpoint.includes('test-oddsblaze') || endpoint.includes('ping')) {
       throw error;
     }
 

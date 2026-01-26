@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../../lib/supabase";
-import { Save, Globe, Loader2, Power, CheckCircle2, Flame, Play, AlertCircle } from "lucide-react";
+import { Save, Globe, Loader2, Power, CheckCircle2, Flame, Play, AlertCircle, Activity } from "lucide-react";
 import { useToast } from "../../contexts/ToastContext";
 import { useAuth } from "../../contexts/AuthContext";
 import { apiRequest } from "../../lib/apiClient";
@@ -11,6 +11,7 @@ export function AdminIntegrations() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
+  const [pingStatus, setPingStatus] = useState<'checking' | 'online' | 'offline'>('checking');
 
   // System API States
   const [apiKey, setApiKey] = useState("");
@@ -26,7 +27,18 @@ export function AdminIntegrations() {
   useEffect(() => {
     if (!user) return;
     loadAdminSettings();
+    checkBackendHealth();
   }, [user]);
+
+  const checkBackendHealth = async () => {
+    try {
+      await apiRequest('/ping');
+      setPingStatus('online');
+    } catch (e) {
+      console.error("Backend offline:", e);
+      setPingStatus('offline');
+    }
+  };
 
   const loadAdminSettings = async () => {
     try {
@@ -104,11 +116,13 @@ export function AdminIntegrations() {
       if (res.success) {
         toast(res.message, "success");
       } else {
-        toast("Falha: " + (res.error || "Erro desconhecido"), "error");
+        // Mostra o erro real retornado pelo backend
+        toast(`Falha: ${res.error || "Erro desconhecido"}`, "error");
       }
     } catch (err: any) {
       console.error("Erro no teste:", err);
-      toast("Erro de Conexão: O backend não respondeu. Verifique o deploy.", "error");
+      // Mostra a mensagem de exceção real (ex: 404, 500)
+      toast(err.message || "Erro crítico de conexão.", "error");
     } finally {
       setTesting(false);
     }
@@ -118,6 +132,35 @@ export function AdminIntegrations() {
 
   return (
     <div className="space-y-8 max-w-4xl">
+      
+      {/* Status do Backend */}
+      <div className={`flex items-center gap-3 p-4 rounded-lg border ${
+        pingStatus === 'online' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : 
+        pingStatus === 'offline' ? 'bg-red-500/10 border-red-500/20 text-red-400' : 
+        'bg-slate-900 border-slate-800 text-slate-400'
+      }`}>
+        <Activity size={20} className={pingStatus === 'checking' ? 'animate-pulse' : ''} />
+        <div className="flex-1">
+          <p className="text-sm font-bold">
+            Status do Servidor: {
+              pingStatus === 'online' ? 'ONLINE (Pronto para conectar)' : 
+              pingStatus === 'offline' ? 'OFFLINE (Verifique o Deploy)' : 
+              'Verificando...'
+            }
+          </p>
+          {pingStatus === 'offline' && (
+            <p className="text-xs mt-1 opacity-80">
+              As funções de backend não estão respondendo. Certifique-se de que o deploy na Vercel foi concluído com sucesso.
+            </p>
+          )}
+        </div>
+        {pingStatus === 'offline' && (
+          <button onClick={checkBackendHealth} className="px-3 py-1.5 bg-red-500/20 hover:bg-red-500/30 rounded text-xs font-bold transition-colors">
+            Tentar Novamente
+          </button>
+        )}
+      </div>
+
       <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-lg">
         <div className="flex items-center gap-3 mb-6 border-b border-slate-800 pb-4">
           <div className="p-2 bg-purple-500/10 rounded-lg">
