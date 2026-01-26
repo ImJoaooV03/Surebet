@@ -57,6 +57,19 @@ const saveLocalUsers = (users: any[]) => {
 
 // Mock data para outras rotas
 const getMockData = (endpoint: string, options?: RequestInit) => {
+  // --- MOCK PARA TESTE DE INTEGRAÇÃO (ODDS BLAZE) ---
+  if (endpoint.includes('test-oddsblaze')) {
+    const body = JSON.parse(options?.body as string || '{}');
+    if (body.apiKey) {
+      return { 
+        success: true, 
+        message: "Ambiente Local: Chave validada (Simulação). Faça o deploy para conexão real.",
+        sample: [{ id: 'mock-event', home_team: 'Time A', away_team: 'Time B' }]
+      };
+    }
+    return { success: false, error: "Chave de API ausente." };
+  }
+
   // --- MOCK INTELIGENTE PARA USUÁRIOS (PERSISTENTE) ---
   if (endpoint.includes('/admin/users')) {
     const users = getLocalUsers();

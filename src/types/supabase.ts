@@ -65,6 +65,8 @@ export interface Database {
           api_enabled?: boolean
           secondary_api_key?: string | null
           secondary_api_enabled?: boolean
+          oddsblaze_key?: string | null
+          oddsblaze_enabled?: boolean
           alert_preferences?: Json | null
           telegram_chat_id?: string | null
           bookmaker_settings?: Json | null
@@ -84,6 +86,8 @@ export interface Database {
           api_enabled?: boolean
           secondary_api_key?: string | null
           secondary_api_enabled?: boolean
+          oddsblaze_key?: string | null
+          oddsblaze_enabled?: boolean
           alert_preferences?: Json | null
           telegram_chat_id?: string | null
           bookmaker_settings?: Json | null
@@ -103,6 +107,8 @@ export interface Database {
           api_enabled?: boolean
           secondary_api_key?: string | null
           secondary_api_enabled?: boolean
+          oddsblaze_key?: string | null
+          oddsblaze_enabled?: boolean
           alert_preferences?: Json | null
           telegram_chat_id?: string | null
           bookmaker_settings?: Json | null
@@ -153,10 +159,10 @@ export interface Database {
           created_at?: string
         }
       }
-      opportunities: { Row: {} } // Placeholder
-      events: { Row: {} } // Placeholder
-      request_budget: { Row: {} } // Placeholder
-      event_queue: { Row: {} } // Placeholder
+      opportunities: { Row: {} } 
+      events: { Row: {} } 
+      request_budget: { Row: {} } 
+      event_queue: { Row: {} } 
     }
     Functions: {
       redeem_activation_code: {
