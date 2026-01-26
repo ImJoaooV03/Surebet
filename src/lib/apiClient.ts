@@ -117,15 +117,20 @@ export async function apiRequest<T>(endpoint: string, options?: RequestInit): Pr
     // Verificação de Content-Type
     const contentType = res.headers.get("content-type");
     if (!contentType || !contentType.includes("application/json")) {
-      // Se não for JSON, provavelmente é um erro 404/500 do servidor web retornando HTML
+      // Tenta ler o corpo da resposta para entender o erro (pode ser HTML de erro do Vercel)
+      const textBody = await res.text().catch(() => "Sem corpo de resposta");
+      
       console.warn(`[API] Resposta não-JSON de ${endpoint}. Status: ${res.status}`);
+      console.warn(`[API] Corpo: ${textBody.substring(0, 200)}...`);
       
       // Se for o teste da OddsBlaze, lançamos erro detalhado para a UI mostrar
       if (endpoint.includes('test-oddsblaze')) {
-        let errorMsg = `O backend não respondeu (Status ${res.status}).`;
-        if (res.status === 404) errorMsg = "Erro 404: A função da API não foi encontrada. Verifique se o arquivo 'api/admin/test-oddsblaze.ts' foi deployado.";
-        if (res.status === 500) errorMsg = "Erro 500: O servidor encontrou um erro interno. Verifique os logs do Vercel.";
+        let errorMsg = `Erro ${res.status}: O backend retornou HTML/Texto.`;
         
+        if (res.status === 404) errorMsg = "Erro 404: Rota da API não encontrada. Verifique o vercel.json.";
+        if (res.status === 500) errorMsg = "Erro 500: O servidor falhou. Verifique as Variáveis de Ambiente.";
+        if (textBody.includes("Vercel")) errorMsg += " (Erro da Vercel)";
+
         throw new Error(errorMsg);
       }
 
