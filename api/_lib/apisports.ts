@@ -1,4 +1,4 @@
-import { spend } from './budget';
+import { spend } from './budget.js';
 
 const BASE_URLS: Record<string, string> = {
   football: 'https://v3.football.api-sports.io',

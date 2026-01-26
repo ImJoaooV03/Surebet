@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getSettings } from '../_lib/settings';
-import { apiSportsGet } from '../_lib/apisports';
+import { getSettings } from '../_lib/settings.js';
+import { apiSportsGet } from '../_lib/apisports.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const settings = await getSettings();

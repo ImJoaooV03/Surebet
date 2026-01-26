@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { supabaseAdmin } from './_lib/supabaseAdmin';
-import { getSettings } from './_lib/settings';
+import { supabaseAdmin } from './_lib/supabaseAdmin.js';
+import { getSettings } from './_lib/settings.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const settings = await getSettings();

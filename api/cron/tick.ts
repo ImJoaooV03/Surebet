@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getSettings } from '../_lib/settings';
-import { supabaseAdmin } from '../_lib/supabaseAdmin';
-import { fetchOddsBlazeData, processOddsBlazeEvents } from '../_lib/oddsblaze';
+import { getSettings } from '../_lib/settings.js';
+import { supabaseAdmin } from '../_lib/supabaseAdmin.js';
+import { fetchOddsBlazeData, processOddsBlazeEvents } from '../_lib/oddsblaze.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const { token } = req.query;

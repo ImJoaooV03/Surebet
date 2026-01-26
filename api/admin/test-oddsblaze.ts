@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { fetchOddsBlazeData } from '../_lib/oddsblaze';
+import { fetchOddsBlazeData } from '../_lib/oddsblaze.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // CORS Headers manuais para garantir (caso necessário)

@@ -1,4 +1,4 @@
-import { calculateSurebet, normalizeOutcomeName } from './engine';
+import { calculateSurebet, normalizeOutcomeName } from './engine.js';
 
 // --- Interfaces para a Odds Blaze API ---
 interface OddsBlazeEvent {
