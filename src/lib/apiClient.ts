@@ -117,19 +117,19 @@ export async function apiRequest<T>(endpoint: string, options?: RequestInit): Pr
     // Verificação de Content-Type
     const contentType = res.headers.get("content-type");
     if (!contentType || !contentType.includes("application/json")) {
-      // Tenta ler o corpo da resposta para entender o erro (pode ser HTML de erro do Vercel)
+      // Tenta ler o corpo da resposta para entender o erro
       const textBody = await res.text().catch(() => "Sem corpo de resposta");
       
       console.warn(`[API] Resposta não-JSON de ${endpoint}. Status: ${res.status}`);
-      console.warn(`[API] Corpo: ${textBody.substring(0, 200)}...`);
       
-      // Se for o teste da OddsBlaze, lançamos erro detalhado para a UI mostrar
+      // Se for o teste da OddsBlaze, lançamos erro detalhado mas LIMPO
       if (endpoint.includes('test-oddsblaze') || endpoint.includes('ping')) {
-        let errorMsg = `Erro ${res.status}: O backend retornou HTML/Texto.`;
+        let errorMsg = `Erro ${res.status}: O backend não retornou JSON.`;
         
-        if (res.status === 404) errorMsg = "Erro 404: Rota da API não encontrada. Verifique o vercel.json.";
-        if (res.status === 500) errorMsg = "Erro 500: O servidor falhou. Verifique as Variáveis de Ambiente.";
+        if (res.status === 404) errorMsg = "Erro 404: Rota não encontrada.";
+        if (res.status === 500) errorMsg = "Erro 500: Erro interno do servidor.";
         if (textBody.includes("Vercel")) errorMsg += " (Erro da Vercel)";
+        if (textBody.includes("Cloudflare") || textBody.includes("R2")) errorMsg += " (Erro na API Externa - 404)";
 
         throw new Error(errorMsg);
       }
@@ -140,7 +140,6 @@ export async function apiRequest<T>(endpoint: string, options?: RequestInit): Pr
     if (!res.ok) {
       // Tenta extrair a mensagem de erro do JSON
       const errorBody = await res.json().catch(() => ({}));
-      // O backend pode enviar 'message' ou 'error'
       const errorMessage = errorBody.message || errorBody.error || `API Error: ${res.status}`;
       throw new Error(errorMessage);
     }
@@ -151,6 +150,10 @@ export async function apiRequest<T>(endpoint: string, options?: RequestInit): Pr
     
     // Propaga o erro se for o teste de conexão, para o usuário ver o feedback real
     if (endpoint.includes('test-oddsblaze') || endpoint.includes('ping')) {
+      // Se a mensagem for muito longa (HTML), trunca
+      if (error.message && error.message.length > 200) {
+        throw new Error("Erro na resposta da API (Conteúdo HTML inválido recebido). Verifique os logs.");
+      }
       throw error;
     }
 
